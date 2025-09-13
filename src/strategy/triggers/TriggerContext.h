@@ -228,6 +228,7 @@ public:
         creators["travel flight status"] = &TriggerContext::travel_flight_status;
         creators["can self resurrect"] = &TriggerContext::can_self_resurrect;
         creators["new pet"] = &TriggerContext::new_pet;
+        creators["in dungeon"] = &TriggerContext::in_dungeon;
     }
 
 private:
@@ -427,6 +428,7 @@ private:
     static Trigger* travel_flight_status(PlayerbotAI* botAI) { return new NewRpgStatusTrigger(botAI, RPG_TRAVEL_FLIGHT); }
     static Trigger* can_self_resurrect(PlayerbotAI* ai) { return new SelfResurrectTrigger(ai); }
     static Trigger* new_pet(PlayerbotAI* ai) { return new NewPetTrigger(ai); }
+    static Trigger* in_dungeon(PlayerbotAI* ai) { return new InDungeonTrigger(ai); }
 };
 
 #endif

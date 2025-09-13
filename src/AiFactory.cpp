@@ -6,6 +6,8 @@
 #include "AiFactory.h"
 
 #include "BattlegroundMgr.h"
+#include "Log.h"
+#include "Chat.h"
 #include "DKAiObjectContext.h"
 #include "DruidAiObjectContext.h"
 #include "Engine.h"
@@ -59,6 +61,7 @@ uint8 AiFactory::GetPlayerSpecTab(Player* bot)
 {
     std::map<uint8, uint32> tabs = GetPlayerSpecTabs(bot);
 
+
     if (bot->GetLevel() >= 10 && ((tabs[0] + tabs[1] + tabs[2]) > 0))
     {
         int8 tab = -1;
@@ -71,6 +74,8 @@ uint8 AiFactory::GetPlayerSpecTab(Player* bot)
                 max = tabs[i];
             }
         }
+        
+        
         return tab;
     }
     else
@@ -275,6 +280,7 @@ std::string AiFactory::GetPlayerSpecName(Player* player)
 void AiFactory::AddDefaultCombatStrategies(Player* player, PlayerbotAI* const facade, Engine* engine)
 {
     uint8 tab = GetPlayerSpecTab(player);
+    
 
     if (!player->InBattleground())
     {
@@ -350,25 +356,48 @@ void AiFactory::AddDefaultCombatStrategies(Player* player, PlayerbotAI* const fa
 
             break;
         case CLASS_DRUID:
-            if (tab == 0)
+        {
+            std::map<uint8, uint32> tabs = GetPlayerSpecTabs(player);
+            
+            if (tab == 0)  // Spec Balance
             {
                 engine->addStrategiesNoInit("caster", "cure", "caster aoe", "dps assist", nullptr);
                 engine->addStrategy("caster debuff", false);
             }
-            else if (tab == 2)
-                engine->addStrategiesNoInit("heal", "cure", "dps assist", nullptr);
-            else
+            else if (tab == 2)  // Spec Restoration
             {
-                if (player->HasSpell(768) /*cat form*/&& !player->HasAura(16931) /*thick hide*/)
+                engine->addStrategiesNoInit("heal", "cure", "dps assist", nullptr);
+            }
+            else if (tab == 1)  // Spec Feral - Verificar que realmente sea Feral
+            {
+                // Solo usar cat/bear si realmente es spec Feral (tab == 1)
+                // Verificar que tenga más talentos en Feral que en otras specs
+                if (tabs[1] > tabs[0] && tabs[1] > tabs[2])  // Feral tiene más talentos
                 {
-                    engine->addStrategiesNoInit("cat", "dps assist", nullptr);
+                    if (player->HasSpell(768) /*cat form*/&& !player->HasAura(16931) /*thick hide*/)
+                    {
+                        engine->addStrategiesNoInit("cat", "dps assist", nullptr);
+                    }
+                    else
+                    {
+                        engine->addStrategiesNoInit("bear", "tank assist", nullptr);
+                    }
                 }
                 else
                 {
-                    engine->addStrategiesNoInit("bear", "tank assist", nullptr);
+                    // Si no es realmente Feral, usar caster por defecto
+                    engine->addStrategiesNoInit("caster", "cure", "caster aoe", "dps assist", nullptr);
+                    engine->addStrategy("caster debuff", false);
                 }
             }
+            else  // Fallback para casos no esperados - usar caster por defecto
+            {
+                // Si no se puede determinar la spec correctamente, usar caster por defecto para druidas
+                engine->addStrategiesNoInit("caster", "cure", "caster aoe", "dps assist", nullptr);
+                engine->addStrategy("caster debuff", false);
+            }
             break;
+        }
         case CLASS_HUNTER:
             if (tab == 0)  // Beast Mastery
                 engine->addStrategiesNoInit("bm", nullptr);
@@ -449,6 +478,11 @@ void AiFactory::AddDefaultCombatStrategies(Player* player, PlayerbotAI* const fa
                         engine->addStrategiesNoInit("caster", "caster aoe", nullptr);
                         engine->addStrategy("caster debuff", false);
                     }
+                    else if (tab == DRUID_TAB_BALANCE)
+                    {
+                        engine->addStrategiesNoInit("caster", "caster aoe", nullptr);
+                        engine->addStrategy("caster debuff", false);
+                    }
                     break;
                 }
                 case CLASS_SHAMAN:
@@ -456,6 +490,14 @@ void AiFactory::AddDefaultCombatStrategies(Player* player, PlayerbotAI* const fa
                     if (tab == SHAMAN_TAB_RESTORATION)
                     {
                         engine->addStrategiesNoInit("caster", "caster aoe", "bmana", nullptr);
+                    }
+                    else if (tab == SHAMAN_TAB_ELEMENTAL)
+                    {
+                        engine->addStrategiesNoInit("caster", "caster aoe", "bmana", nullptr);
+                    }
+                    else if (tab == SHAMAN_TAB_ENHANCEMENT)
+                    {
+                        engine->addStrategiesNoInit("melee", "melee aoe", "bdps", nullptr);
                     }
                     break;
                 }
@@ -472,13 +514,20 @@ void AiFactory::AddDefaultCombatStrategies(Player* player, PlayerbotAI* const fa
             }
         }
     }
-    if (sRandomPlayerbotMgr->IsRandomBot(player))
+    // Para clases con lógica específica, no sobrescribir las estrategias asignadas
+    if (player->getClass() != CLASS_DRUID && 
+        player->getClass() != CLASS_SHAMAN && 
+        player->getClass() != CLASS_PRIEST && 
+        player->getClass() != CLASS_PALADIN)
     {
-        engine->ChangeStrategy(sPlayerbotAIConfig->randomBotCombatStrategies);
-    }
-    else
-    {
-        engine->ChangeStrategy(sPlayerbotAIConfig->combatStrategies);
+        if (sRandomPlayerbotMgr->IsRandomBot(player))
+        {
+            engine->ChangeStrategy(sPlayerbotAIConfig->randomBotCombatStrategies);
+        }
+        else
+        {
+            engine->ChangeStrategy(sPlayerbotAIConfig->combatStrategies);
+        }
     }
 
     // Battleground switch

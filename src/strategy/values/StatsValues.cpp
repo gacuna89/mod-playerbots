@@ -120,7 +120,11 @@ bool HasManaValue::Calculate()
     if (!target)
         return false;
 
-    return target->GetPower(POWER_MANA);
+    // Solo devolver true si la clase realmente usa mana
+    if (target->getPowerType() != POWER_MANA)
+        return false;
+
+    return target->GetMaxPower(POWER_MANA) > 0;
 }
 
 Unit* ComboPointsValue::GetTarget()

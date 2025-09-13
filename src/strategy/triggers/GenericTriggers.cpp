@@ -730,3 +730,8 @@ bool NewPetTrigger::IsActive()
     // Otherwise, do not activate
     return false;
 }
+
+bool InDungeonTrigger::IsActive()
+{
+    return bot->GetMap() && (bot->GetMap()->IsDungeon() || bot->GetMap()->IsRaid()) && bot->GetGroup();
+}

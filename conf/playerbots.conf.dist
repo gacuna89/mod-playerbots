@@ -561,6 +561,9 @@ AiPlayerbot.PreQuests = 0
 # Enable LFG for randombots
 AiPlayerbot.RandomBotJoinLfg = 1
 
+# Enable custom dungeon joining for randombots (alternative to LFG)
+AiPlayerbot.RandomBotJoinDungeon = 1
+
 # Enable/Disable periodic online - offline of randombots to mimic the real-world scenario where not all players are online simultaneously
 # When enabled, randombots are randomly selected to go online or offline periodically from a larger set
 # Default: 0 (disabled, the set of online bots remains fixed)

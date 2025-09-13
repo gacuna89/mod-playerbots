@@ -12,8 +12,8 @@
 #include "RangeTriggers.h"
 #include "Trigger.h"
 #include "Player.h"
+#include "PlayerbotAI.h"
 
-class PlayerbotAI;
 class Unit;
 
 class StatAvailable : public Trigger
@@ -953,6 +953,14 @@ public:
 private:
     ObjectGuid lastPetGuid;
     bool triggered;
+};
+
+class InDungeonTrigger : public Trigger
+{
+public:
+    InDungeonTrigger(PlayerbotAI* botAI) : Trigger(botAI, "in dungeon") {}
+
+    bool IsActive() override;
 };
 
 #endif

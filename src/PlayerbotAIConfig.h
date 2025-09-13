@@ -138,6 +138,7 @@ public:
     uint32 minRandomBotsPriceChangeInterval, maxRandomBotsPriceChangeInterval;
     uint32 disabledWithoutRealPlayerLoginDelay, disabledWithoutRealPlayerLogoutDelay;
     bool randomBotJoinLfg;
+    bool randomBotJoinDungeon;
 
     // chat
     bool randomBotTalk;
