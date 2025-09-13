@@ -977,6 +977,21 @@ bool MovementAction::IsMovingAllowed()
     if (botAI->IsInVehicle() && !botAI->IsInVehicle(true))
         return false;
 
+    // Check for Dalaran trespasser spells and reset pathfinding if detected
+    if (bot->HasAura(54028) || bot->HasAura(54029)) // SPELL_TRESPASSER_A or SPELL_TRESPASSER_H
+    {
+        // Reset pathfinding to prevent teleport loop
+        bot->GetMotionMaster()->Clear();
+        bot->GetMotionMaster()->MoveIdle();
+        
+        // Clear last movement to force new path calculation
+        LastMovement& lastMove = *context->GetValue<LastMovement&>("last movement");
+        lastMove.Set(0, 0, 0, 0, 0, 0, MovementPriority::MOVEMENT_IDLE);
+        
+        LOG_DEBUG("playerbots", "Bot {} pathfinding reset due to Dalaran trespasser spell", bot->GetName());
+        return false;
+    }
+
     if (bot->isFrozen() || bot->IsPolymorphed() || (bot->isDead() && !bot->HasPlayerFlag(PLAYER_FLAGS_GHOST)) ||
         bot->IsBeingTeleported() || bot->HasRootAura() || bot->HasSpiritOfRedemptionAura() ||
         bot->HasConfuseAura() || bot->IsCharmed() || bot->HasStunAura() ||

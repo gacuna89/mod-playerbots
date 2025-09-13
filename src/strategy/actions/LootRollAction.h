@@ -14,6 +14,13 @@ struct ItemTemplate;
 
 enum RollVote : uint8;
 
+// Spec traits structure for smart loot decisions
+struct SpecTraits
+{
+    uint8 cls;
+    std::string spec;
+};
+
 class LootRollAction : public QueryItemUsageAction
 {
 public:
@@ -23,6 +30,10 @@ public:
 
 protected:
     RollVote CalculateRollVote(ItemTemplate const* proto);
+    RollVote CalculateSmartRollVote(ItemTemplate const* proto, SpecTraits const& traits, int32 randomProperty);
+    bool IsCrossArmorUpgrade(ItemTemplate const* proto, SpecTraits const& traits);
+    bool IsTokenLikelyUpgrade(ItemTemplate const* proto);
+    static SpecTraits GetSpecTraits(Player* player);
 };
 
 bool CanBotUseToken(ItemTemplate const* proto, Player* bot);

@@ -335,6 +335,15 @@ public:
 
     bool freeMethodLoot;
     int32 lootRollLevel;
+    
+    // Smart loot roll system
+    bool smartNeedBySpec;
+    bool allowBoENeedIfUpgrade;
+    bool allowBoUNeedIfUpgrade;
+    float crossArmorExtraMargin;
+    bool useDEButton;
+    float tokenILevelMargin;
+    bool announceToMaster;
     std::string autoPickReward;
     bool autoEquipUpgradeLoot;
     float equipUpgradeThreshold;

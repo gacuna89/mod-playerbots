@@ -106,10 +106,6 @@ bool LfgJoinAction::JoinLFG()
     std::vector<uint32> dungeons;
     bool crossFactionEnabled = sWorld->getBoolConfig(CONFIG_ALLOW_CROSSFACTION_DUNGEON);
     
-    LOG_INFO("playerbots", "Bot {} {}: Cross-faction enabled: {}, Team: {}, Config value: {}", 
-             bot->GetName(), bot->GetGUID().ToString(), crossFactionEnabled, 
-             bot->GetTeamId() == TEAM_ALLIANCE ? "ALLIANCE" : "HORDE",
-             sWorld->getBoolConfig(CONFIG_ALLOW_CROSSFACTION_DUNGEON));
     
     if (crossFactionEnabled)
     {
@@ -118,17 +114,11 @@ bool LfgJoinAction::JoinLFG()
         std::vector<uint32> hordeDungeons = sRandomPlayerbotMgr->LfgDungeons[TEAM_HORDE];
         dungeons.insert(dungeons.end(), hordeDungeons.begin(), hordeDungeons.end());
         
-        LOG_INFO("playerbots", "Bot {} {}: Using cross-faction dungeons - Alliance: {}, Horde: {}, Total: {}", 
-                 bot->GetName(), bot->GetGUID().ToString(), 
-                 sRandomPlayerbotMgr->LfgDungeons[TEAM_ALLIANCE].size(),
-                 hordeDungeons.size(), dungeons.size());
     }
     else
     {
         dungeons = sRandomPlayerbotMgr->LfgDungeons[bot->GetTeamId()];
         
-        LOG_INFO("playerbots", "Bot {} {}: Using same-faction dungeons - Count: {}, TeamId: {}", 
-                 bot->GetName(), bot->GetGUID().ToString(), dungeons.size(), bot->GetTeamId());
     }
     
     if (!dungeons.size())

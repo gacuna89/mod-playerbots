@@ -291,6 +291,35 @@ AiPlayerbot.FreeMethodLoot = 0
 # Default: 1 (greed)
 AiPlayerbot.LootRollLevel = 1
 
+# Smart loot roll system - Intelligent loot decision making
+# NEED only if the item matches bot's main spec (stats & armor/weapon type)
+# Recommended: 1
+AiPlayerbot.Roll.SmartNeedBySpec = 1
+
+# By default, GREED on Bind-on-Equip unless enabled
+# Recommended: 0
+AiPlayerbot.Roll.AllowBoENeedIfUpgrade = 0
+
+# By default, GREED on Bind-on-Use unless enabled
+# Recommended: 0
+AiPlayerbot.Roll.AllowBoUNeedIfUpgrade = 0
+
+# Cross-armor NEED allowed only if newScore >= oldScore * margin
+# Recommended: 1.20 (conservative). Use 9.99 to forbid off-armor NEED
+AiPlayerbot.Roll.CrossArmorExtraMargin = 1.20
+
+# If item is DE-only and NBG is active, bots use DE button
+# Recommended: 1
+AiPlayerbot.Roll.UseDEButton = 1
+
+# ilvl margin to treat a token as a likely upgrade
+# Recommended: 0.1 (prevents NEED on same-tier duplicates)
+AiPlayerbot.Roll.TokenILevelMargin = 0.1
+
+# Whisper each bot's roll choice to its master
+# Recommended: 0
+AiPlayerbot.Roll.AnnounceToMaster = 0
+
 #
 #
 #
