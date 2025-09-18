@@ -13,6 +13,7 @@
 #include "NamedObjectContext.h"
 #include "Playerbots.h"
 #include "PullStrategy.h"
+#include "RitualActions.h"
 #include "Strategy.h"
 #include "TankWarlockStrategy.h"
 #include "UseItemAction.h"
@@ -183,6 +184,12 @@ public:
         creators["curse of weakness"] = &WarlockTriggerFactoryInternal::curse_of_weakness;
         creators["wrong pet"] = &WarlockTriggerFactoryInternal::wrong_pet;
         creators["rain of fire channel check"] = &WarlockTriggerFactoryInternal::rain_of_fire_channel_check;
+        creators["in dungeon or raid"] = &WarlockTriggerFactoryInternal::in_dungeon_or_raid;
+        creators["no soulwell"] = &WarlockTriggerFactoryInternal::no_soulwell;
+        creators["ritual of souls"] = &WarlockTriggerFactoryInternal::ritual_of_souls;
+        creators["soul portal available"] = &WarlockTriggerFactoryInternal::soul_portal_available;
+        creators["loot soulwell"] = &WarlockTriggerFactoryInternal::loot_soulwell;
+        creators["needs conjured items"] = &WarlockTriggerFactoryInternal::needs_conjured_items;
     }
 
 private:
@@ -229,6 +236,12 @@ private:
     static Trigger* curse_of_weakness(PlayerbotAI* ai) { return new CurseOfWeaknessTrigger(ai); }
     static Trigger* wrong_pet(PlayerbotAI* ai) { return new WrongPetTrigger(ai); }
     static Trigger* rain_of_fire_channel_check(PlayerbotAI* ai) { return new RainOfFireChannelCheckTrigger(ai); }
+    static Trigger* in_dungeon_or_raid(PlayerbotAI* botAI) { return new InDungeonOrRaidTrigger(botAI); }
+    static Trigger* no_soulwell(PlayerbotAI* botAI) { return new NoSoulwellTrigger(botAI); }
+    static Trigger* ritual_of_souls(PlayerbotAI* botAI) { return new RitualOfSoulsTrigger(botAI); }
+    static Trigger* soul_portal_available(PlayerbotAI* botAI) { return new SoulPortalAvailableTrigger(botAI); }
+    static Trigger* loot_soulwell(PlayerbotAI* botAI) { return new LootSoulwellTrigger(botAI); }
+    static Trigger* needs_conjured_items(PlayerbotAI* botAI) { return new NeedsConjuredItemsTrigger(botAI); }
 };
 
 class WarlockAiObjectContextInternal : public NamedObjectContext<Action>
@@ -302,6 +315,11 @@ public:
         creators["curse of exhaustion"] = &WarlockAiObjectContextInternal::curse_of_exhaustion;
         creators["curse of tongues"] = &WarlockAiObjectContextInternal::curse_of_tongues;
         creators["curse of weakness"] = &WarlockAiObjectContextInternal::curse_of_weakness;
+        creators["ritual of souls"] = &WarlockAiObjectContextInternal::ritual_of_souls;
+        creators["interact with soul portal"] = &WarlockAiObjectContextInternal::interact_with_soul_portal;
+        creators["loot soulwell"] = &WarlockAiObjectContextInternal::loot_soulwell;
+        creators["move away from spawn"] = &WarlockAiObjectContextInternal::move_away_from_spawn;
+        creators["check conjured items"] = &WarlockAiObjectContextInternal::check_conjured_items;
     }
 
 private:
@@ -370,6 +388,11 @@ private:
     static Action* curse_of_exhaustion(PlayerbotAI* ai) { return new CastCurseOfExhaustionAction(ai); }
     static Action* curse_of_tongues(PlayerbotAI* ai) { return new CastCurseOfTonguesAction(ai); }
     static Action* curse_of_weakness(PlayerbotAI* ai) { return new CastCurseOfWeaknessAction(ai); }
+    static Action* ritual_of_souls(PlayerbotAI* botAI) { return new CastRitualOfSoulsAction(botAI); }
+    static Action* interact_with_soul_portal(PlayerbotAI* botAI) { return new InteractWithSoulPortalAction(botAI); }
+    static Action* loot_soulwell(PlayerbotAI* botAI) { return new LootSoulwellAction(botAI); }
+    static Action* move_away_from_spawn(PlayerbotAI* botAI) { return new MoveAwayFromSpawnAction(botAI); }
+    static Action* check_conjured_items(PlayerbotAI* botAI) { return new CheckConjuredItemsAction(botAI); }
 };
 
 SharedNamedObjectContextList<Strategy> WarlockAiObjectContext::sharedStrategyContexts;

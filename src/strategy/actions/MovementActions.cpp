@@ -2956,3 +2956,129 @@ bool MoveAwayFromPlayerWithDebuffAction::isPossible()
 {
     return bot->CanFreeMove();
 }
+
+// Tank advance to boss implementation
+bool TankAdvanceToBossAction::isUseful()
+{
+    Player* bot = botAI->GetBot();
+    
+    // Only useful for tank classes
+    if (bot->getClass() != CLASS_WARRIOR && bot->getClass() != CLASS_PALADIN && 
+        bot->getClass() != CLASS_DEATH_KNIGHT) 
+    {
+        return false;
+    }
+    
+    // Only in dungeons/raids
+    if (!bot->GetMap()->IsDungeon() && !bot->GetMap()->IsRaid())
+    {
+        return false;
+    }
+    
+    // Check if command is enabled (stored in AI value)
+    if (!AI_VALUE(bool, "tank advance enabled"))
+    {
+        return false;
+    }
+    
+    // Check if party is ready (health > 80%, mana > 80%)
+    Group* group = bot->GetGroup();
+    if (!group) return false;
+    
+    for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+    {
+        Player* member = ref->GetSource();
+        if (member && member->IsAlive())
+        {
+            float healthPercent = member->GetHealthPct();
+            float manaPercent = member->GetPowerPct(POWER_MANA);
+            
+            if (healthPercent < 80.0f || manaPercent < 80.0f)
+            {
+                botAI->TellMaster("DEBUG: TankAdvanceToBossAction - Party not ready. Health: " + 
+                    std::to_string(healthPercent) + "%, Mana: " + std::to_string(manaPercent) + "%");
+                return false;
+            }
+        }
+    }
+    
+    // Check if there's a boss target
+    Unit* boss = AI_VALUE(Unit*, "boss target");
+    if (!boss)
+    {
+        botAI->TellMaster("DEBUG: TankAdvanceToBossAction - No boss target found");
+        return false;
+    }
+    
+    // Check if we're not already in combat
+    if (bot->IsInCombat())
+    {
+        return false;
+    }
+    
+    botAI->TellMaster("DEBUG: TankAdvanceToBossAction - ÚTIL! Party ready, boss found, advancing");
+    return true;
+}
+
+bool TankAdvanceToBossAction::Execute(Event event)
+{
+    Player* bot = botAI->GetBot();
+    Unit* boss = AI_VALUE(Unit*, "boss target");
+    
+    if (!boss)
+    {
+        botAI->TellMaster("DEBUG: TankAdvanceToBossAction - No boss target found");
+        return false;
+    }
+    
+    // Check distance to boss
+    float distance = bot->GetDistance(boss);
+    if (distance < 10.0f)
+    {
+        botAI->TellMaster("DEBUG: TankAdvanceToBossAction - Already close to boss");
+        return false;
+    }
+    
+    // Move to boss (5 yards away for tank positioning)
+    botAI->TellMaster("DEBUG: TankAdvanceToBossAction - Moving to boss at distance: " + std::to_string(distance));
+    return MoveTo(boss, 5.0f);
+}
+
+// Tank advance enable/disable implementation
+bool TankAdvanceEnableAction::Execute(Event event)
+{
+    Player* bot = botAI->GetBot();
+    
+    // Only for tank classes
+    if (bot->getClass() != CLASS_WARRIOR && bot->getClass() != CLASS_PALADIN && 
+        bot->getClass() != CLASS_DEATH_KNIGHT) 
+    {
+        botAI->TellMaster("DEBUG: TankAdvanceEnableAction - Solo para tanques");
+        return false;
+    }
+    
+    // Enable tank advance
+    botAI->GetAiObjectContext()->GetValue<bool>("tank advance enabled")->Set(true);
+    botAI->TellMaster("DEBUG: TankAdvanceEnableAction - Tank advance HABILITADO");
+    
+    return true;
+}
+
+bool TankAdvanceDisableAction::Execute(Event event)
+{
+    Player* bot = botAI->GetBot();
+    
+    // Only for tank classes
+    if (bot->getClass() != CLASS_WARRIOR && bot->getClass() != CLASS_PALADIN && 
+        bot->getClass() != CLASS_DEATH_KNIGHT) 
+    {
+        botAI->TellMaster("DEBUG: TankAdvanceDisableAction - Solo para tanques");
+        return false;
+    }
+    
+    // Disable tank advance
+    botAI->GetAiObjectContext()->GetValue<bool>("tank advance enabled")->Set(false);
+    botAI->TellMaster("DEBUG: TankAdvanceDisableAction - Tank advance DESHABILITADO");
+    
+    return true;
+}

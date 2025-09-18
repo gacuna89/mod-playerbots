@@ -2102,3 +2102,4 @@ AiPlayerbot.SummonAtInnkeepersEnabled = 1
 # Buffs will be applied on PP, Sindragosa and Lich King
 
 AiPlayerbot.EnableICCBuffs = 1
+
