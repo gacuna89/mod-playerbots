@@ -264,9 +264,6 @@ public:
         creators["interact with refreshment table"] = &ActionContext::interact_with_refreshment_table;
         creators["interact with soulwell"] = &ActionContext::interact_with_soulwell;
         creators["restore follow behavior"] = &ActionContext::restore_follow_behavior;
-        creators["tank advance to boss"] = &ActionContext::tank_advance_to_boss;
-        creators["tank advance enable"] = &ActionContext::tank_advance_enable;
-        creators["tank advance disable"] = &ActionContext::tank_advance_disable;
     }
 
 private:
@@ -463,9 +460,6 @@ private:
     static Action* interact_with_soulwell(PlayerbotAI* botAI) { return new InteractWithSoulwellAction(botAI); }
     static Action* restore_follow_behavior(PlayerbotAI* botAI) { return new RestoreFollowBehaviorAction(botAI); }
     static Action* check_conjured_items(PlayerbotAI* botAI) { return new CheckConjuredItemsAction(botAI); }
-    static Action* tank_advance_to_boss(PlayerbotAI* botAI) { return new TankAdvanceToBossAction(botAI); }
-    static Action* tank_advance_enable(PlayerbotAI* botAI) { return new TankAdvanceEnableAction(botAI); }
-    static Action* tank_advance_disable(PlayerbotAI* botAI) { return new TankAdvanceDisableAction(botAI); }
 };
 
 #endif
