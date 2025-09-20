@@ -2407,11 +2407,6 @@ bool TankFaceAction::Execute(Event event)
     if (!bot->GetGroup())
         return false;
 
-    // Evitar ejecutar en dungeons para prevenir congelamientos
-    if (bot->GetMap() && bot->GetMap()->IsDungeon())
-    {
-        return false;
-    }
 
     if (!bot->IsWithinMeleeRange(target) || target->isMoving())
         return false;
@@ -2424,12 +2419,6 @@ bool TankFaceAction::Execute(Event event)
     if (averageAngle == 0.0f)
         return false;
 
-    // Evitar ejecutar demasiado frecuentemente para prevenir bucles
-    static uint32 lastExecutionTime = 0;
-    uint32 currentTime = getMSTime();
-    if (currentTime - lastExecutionTime < 2000) // 2 segundos de cooldown
-        return false;
-    lastExecutionTime = currentTime;
 
     float deltaAngle = Position::NormalizeOrientation(averageAngle - target->GetAngle(bot));
     if (deltaAngle > M_PI)
