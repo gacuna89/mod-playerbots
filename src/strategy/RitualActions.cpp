@@ -26,7 +26,7 @@ static std::unordered_map<uint64, uint32> lastFollowRestoration;
 // Helper function to get appropriate search range based on map type
 static float GetRitualSearchRange(Player* bot)
 {
-    return bot->GetMap()->IsBattleground() ? 100.0f : GetRitualSearchRange(bot);
+    return bot->GetMap()->IsBattleground() ? 100.0f : 30.0f;
 }
 // Track if bot has completed ritual interaction to avoid loops
 std::unordered_map<uint64, bool> hasCompletedRitualInteraction;
@@ -994,7 +994,7 @@ bool RestoreFollowBehaviorAction::Execute(Event event)
         // Fallback to DoSpecificAction
         bool followResult = botAI->DoSpecificAction("follow", Event(), true);
         
-        // Additional debug: check if follow action exists
+        // Check if follow action exists
         Action* followAction = botAI->GetAiObjectContext()->GetAction("follow");
         
         return followResult;

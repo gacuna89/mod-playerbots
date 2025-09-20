@@ -49,8 +49,6 @@ public:
             {"gtask", HandleGuildTaskCommand, SEC_GAMEMASTER, Console::Yes},
             {"pmon", HandlePerfMonCommand, SEC_GAMEMASTER, Console::Yes},
             {"rndbot", HandleRandomPlayerbotCommand, SEC_GAMEMASTER, Console::Yes},
-            {"tank advance enable", HandleTankAdvanceEnableCommand, SEC_PLAYER, Console::No},
-            {"tank advance disable", HandleTankAdvanceDisableCommand, SEC_PLAYER, Console::No},
             {"debug", playerbotsDebugCommandTable},
             {"account", playerbotsAccountCommandTable},
         };
@@ -213,91 +211,6 @@ public:
         }
     }
 
-    static bool HandleTankAdvanceEnableCommand(ChatHandler* handler, char const* args)
-    {
-        Player* player = handler->GetPlayer();
-        if (!player)
-            return false;
-
-        PlayerbotMgr* mgr = sPlayerbotsMgr->GetPlayerbotMgr(player);
-        if (mgr)
-        {
-            // Send command to all bots in group
-            Group* group = player->GetGroup();
-            if (group && group->IsLeader(player->GetGUID()))
-            {
-                for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
-                {
-                    Player* member = ref->GetSource();
-                    if (member)
-                    {
-                        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(member);
-                        if (botAI && botAI->GetAiObjectContext())
-                        {
-                            Value<bool>* tankAdvanceValue = botAI->GetAiObjectContext()->GetValue<bool>("tank advance enabled");
-                            if (tankAdvanceValue)
-                            {
-                                tankAdvanceValue->Set(true);
-                                botAI->TellMaster("Tank advance habilitado");
-                            }
-                        }
-                    }
-                }
-            }
-            else
-            {
-                handler->PSendSysMessage("Debes ser el líder del grupo para usar este comando.");
-                return false;
-            }
-            handler->PSendSysMessage("Tank advance habilitado para todos los bots del grupo");
-            return true;
-        }
-        handler->PSendSysMessage("No se encontró PlayerbotMgr para este jugador.");
-        return false;
-    }
-
-    static bool HandleTankAdvanceDisableCommand(ChatHandler* handler, char const* args)
-    {
-        Player* player = handler->GetPlayer();
-        if (!player)
-            return false;
-
-        PlayerbotMgr* mgr = sPlayerbotsMgr->GetPlayerbotMgr(player);
-        if (mgr)
-        {
-            // Send command to all bots in group
-            Group* group = player->GetGroup();
-            if (group && group->IsLeader(player->GetGUID()))
-            {
-                for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
-                {
-                    Player* member = ref->GetSource();
-                    if (member)
-                    {
-                        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(member);
-                        if (botAI && botAI->GetAiObjectContext())
-                        {
-                            Value<bool>* tankAdvanceValue = botAI->GetAiObjectContext()->GetValue<bool>("tank advance enabled");
-                            if (tankAdvanceValue)
-                            {
-                                tankAdvanceValue->Set(false);
-                                botAI->TellMaster("Tank advance deshabilitado");
-                            }
-                        }
-                    }
-                }
-            }
-            else
-            {
-                handler->PSendSysMessage("Debes ser el líder del grupo para usar este comando.");
-                return false;
-            }
-            handler->PSendSysMessage("Tank advance deshabilitado para todos los bots del grupo");
-            return true;
-        }
-        handler->PSendSysMessage("No se encontró PlayerbotMgr para este jugador.");
-        return false;
-    }
 };
 
 void AddSC_playerbots_commandscript() { new playerbots_commandscript(); }

@@ -22,10 +22,6 @@ void NonCombatStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     triggers.push_back(new TriggerNode("needs conjured items", NextAction::array(0, new NextAction("check conjured items", 10.0f), nullptr)));
     triggers.push_back(new TriggerNode("needs follow restoration", NextAction::array(0, new NextAction("restore follow behavior", 12.0f), nullptr)));
     
-    // Tank advance to boss (only when enabled via command)
-    triggers.push_back(new TriggerNode("tank advance to boss", NextAction::array(0, new NextAction("tank advance to boss", 5.0f), nullptr)));
-    triggers.push_back(new TriggerNode("tank advance enable", NextAction::array(0, new NextAction("tank advance enable", 1.0f), nullptr)));
-    triggers.push_back(new TriggerNode("tank advance disable", NextAction::array(0, new NextAction("tank advance disable", 1.0f), nullptr)));
     // triggers.push_back(new TriggerNode("near dark portal", NextAction::array(0, new NextAction("move to dark portal", 1.0f), nullptr)));
     // triggers.push_back(new TriggerNode("at dark portal azeroth", NextAction::array(0, new NextAction("use dark portal azeroth", 1.0f), nullptr)));
     // triggers.push_back(new TriggerNode("at dark portal outland", NextAction::array(0, new NextAction("move from dark portal", 1.0f), nullptr)));

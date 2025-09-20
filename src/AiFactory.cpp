@@ -370,9 +370,9 @@ void AiFactory::AddDefaultCombatStrategies(Player* player, PlayerbotAI* const fa
             }
             else if (tab == 1)  // Spec Feral - Verificar que realmente sea Feral
             {
-                // Solo usar cat/bear si realmente es spec Feral (tab == 1)
-                // Verificar que tenga más talentos en Feral que en otras specs
-                if (tabs[1] > tabs[0] && tabs[1] > tabs[2])  // Feral tiene más talentos
+                // Only use cat/bear if it's really Feral spec (tab == 1)
+                // Verify it has more talents in Feral than in other specs
+                if (tabs[1] > tabs[0] && tabs[1] > tabs[2])  // Feral has more talents
                 {
                     if (player->HasSpell(768) /*cat form*/&& !player->HasAura(16931) /*thick hide*/)
                     {
@@ -514,7 +514,7 @@ void AiFactory::AddDefaultCombatStrategies(Player* player, PlayerbotAI* const fa
             }
         }
     }
-    // Para clases con lógica específica, no sobrescribir las estrategias asignadas
+    // For classes with specific logic, don't override assigned strategies
     if (player->getClass() != CLASS_DRUID && 
         player->getClass() != CLASS_SHAMAN && 
         player->getClass() != CLASS_PRIEST && 

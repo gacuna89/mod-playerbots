@@ -78,8 +78,6 @@ public:
         creators["bank"] = &ChatTriggerContext::bank;
         creators["follow"] = &ChatTriggerContext::follow;
         creators["move from group"] = &ChatTriggerContext::move_from_group;
-        creators["tank advance enable"] = &ChatTriggerContext::tank_advance_enable;
-        creators["tank advance disable"] = &ChatTriggerContext::tank_advance_disable;
         creators["stay"] = &ChatTriggerContext::stay;
         creators["flee"] = &ChatTriggerContext::flee;
         creators["grind"] = &ChatTriggerContext::grind;
@@ -186,8 +184,6 @@ private:
     static Trigger* stay(PlayerbotAI* botAI) { return new ChatCommandTrigger(botAI, "stay"); }
     static Trigger* follow(PlayerbotAI* botAI) { return new ChatCommandTrigger(botAI, "follow"); }
     static Trigger* move_from_group(PlayerbotAI* botAI) { return new ChatCommandTrigger(botAI, "move from group"); }
-    static Trigger* tank_advance_enable(PlayerbotAI* botAI) { return new ChatCommandTrigger(botAI, "tank advance enable"); }
-    static Trigger* tank_advance_disable(PlayerbotAI* botAI) { return new ChatCommandTrigger(botAI, "tank advance disable"); }
     static Trigger* gb(PlayerbotAI* botAI) { return new ChatCommandTrigger(botAI, "gb"); }
     static Trigger* bank(PlayerbotAI* botAI) { return new ChatCommandTrigger(botAI, "bank"); }
     static Trigger* help(PlayerbotAI* botAI) { return new ChatCommandTrigger(botAI, "help"); }

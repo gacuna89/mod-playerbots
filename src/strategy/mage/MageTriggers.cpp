@@ -248,7 +248,7 @@ bool NoRefreshmentTableTrigger::IsActive()
         return false;
     }
     
-    // SIMPLIFICADO AL MÁXIMO: Solo verificar si hay warlock en el grupo
+    // SIMPLIFIED TO MAXIMUM: Only check if there's a warlock in the group
     bool hasWarlock = false;
     
     for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
@@ -261,10 +261,10 @@ bool NoRefreshmentTableTrigger::IsActive()
         }
     }
     
-    // Si hay warlock, verificar si ya terminó su ritual y esperar un poco
+    // If there's a warlock, check if it already finished its ritual and wait a bit
     if (hasWarlock)
     {
-        // Verificar si ya hay un Soul Well (significa que el warlock ya terminó y los bots hicieron click)
+        // Check if there's already a Soul Well (means the warlock finished and bots clicked)
         GameObject* existingSoulWell = bot->FindNearestGameObject(181621, 30.0f); // Soul Well Rank 1
         if (!existingSoulWell)
             existingSoulWell = bot->FindNearestGameObject(193169, 30.0f); // Soul Well Rank 2 (variant 1)

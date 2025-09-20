@@ -324,27 +324,4 @@ private:
     bool alive;
 };
 
-// Tank advance to boss actions
-class TankAdvanceToBossAction : public MovementAction
-{
-public:
-    TankAdvanceToBossAction(PlayerbotAI* botAI) : MovementAction(botAI, "tank advance to boss") {}
-    bool Execute(Event event) override;
-    bool isUseful() override;
-};
-
-class TankAdvanceEnableAction : public Action
-{
-public:
-    TankAdvanceEnableAction(PlayerbotAI* botAI) : Action(botAI, "tank advance enable") {}
-    bool Execute(Event event) override;
-};
-
-class TankAdvanceDisableAction : public Action
-{
-public:
-    TankAdvanceDisableAction(PlayerbotAI* botAI) : Action(botAI, "tank advance disable") {}
-    bool Execute(Event event) override;
-};
-
 #endif
