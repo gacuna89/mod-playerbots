@@ -4,6 +4,9 @@
 
 void WotlkDungeonUKStrategy::InitTriggers(std::vector<TriggerNode*> &triggers)
 {
+    // Call base dungeon strategy first
+    BaseDungeonStrategy::InitTriggers(triggers);
+    
     // Prince Keleseth
     triggers.push_back(new TriggerNode("keleseth frost tomb",
              NextAction::array(0, new NextAction("attack frost tomb", ACTION_RAID + 1), nullptr)));

@@ -4,12 +4,13 @@
 #include "Multiplier.h"
 #include "AiObjectContext.h"
 #include "Strategy.h"
+#include "../../BaseDungeonStrategy.h"
 
 
-class WotlkDungeonUKStrategy : public Strategy
+class WotlkDungeonUKStrategy : public BaseDungeonStrategy
 {
 public:
-    WotlkDungeonUKStrategy(PlayerbotAI* ai) : Strategy(ai) {}
+    WotlkDungeonUKStrategy(PlayerbotAI* ai) : BaseDungeonStrategy(ai) {}
     virtual std::string const getName() override { return "utgarde keep"; }
     virtual void InitTriggers(std::vector<TriggerNode*> &triggers) override;
     virtual void InitMultipliers(std::vector<Multiplier*> &multipliers) override;

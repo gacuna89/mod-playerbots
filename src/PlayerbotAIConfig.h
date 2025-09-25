@@ -138,6 +138,7 @@ public:
     uint32 minRandomBotsPriceChangeInterval, maxRandomBotsPriceChangeInterval;
     uint32 disabledWithoutRealPlayerLoginDelay, disabledWithoutRealPlayerLogoutDelay;
     bool randomBotJoinLfg;
+    bool randomBotJoinDungeon;
 
     // Buff system
     // Min group size to use Greater buffs (Paladin, Mage, Druid). Default: 3
@@ -340,6 +341,15 @@ public:
 
     bool freeMethodLoot;
     int32 lootRollLevel;
+    
+    // Smart loot roll system
+    bool smartNeedBySpec;
+    bool allowBoENeedIfUpgrade;
+    bool allowBoUNeedIfUpgrade;
+    float crossArmorExtraMargin;
+    bool useDEButton;
+    float tokenILevelMargin;
+    bool announceToMaster;
     std::string autoPickReward;
     bool autoEquipUpgradeLoot;
     float equipUpgradeThreshold;

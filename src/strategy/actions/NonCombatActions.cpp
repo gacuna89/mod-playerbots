@@ -58,7 +58,16 @@ bool DrinkAction::isUseful() { return UseItemAction::isUseful() && AI_VALUE2(uin
 
 bool DrinkAction::isPossible()
 {
-    return !bot->IsInCombat() && (botAI->HasCheat(BotCheatMask::food) || UseItemAction::isPossible());
+    if (bot->IsInCombat())
+        return false;
+        
+    if (bot->IsMounted())
+        return false;
+        
+    if (bot->HasAura(27827)) // Spirit of Redemption (Priest angel form)
+        return false;
+        
+    return botAI->HasCheat(BotCheatMask::food) || UseItemAction::isPossible();
 }
 
 bool EatAction::Execute(Event event)
@@ -107,5 +116,14 @@ bool EatAction::isUseful() { return UseItemAction::isUseful() && AI_VALUE2(uint8
 
 bool EatAction::isPossible()
 {
-    return !bot->IsInCombat() && (botAI->HasCheat(BotCheatMask::food) || UseItemAction::isPossible());
+    if (bot->IsInCombat())
+        return false;
+        
+    if (bot->IsMounted())
+        return false;
+        
+    if (bot->HasAura(27827)) // Spirit of Redemption (Priest angel form)
+        return false;
+        
+    return botAI->HasCheat(BotCheatMask::food) || UseItemAction::isPossible();
 }

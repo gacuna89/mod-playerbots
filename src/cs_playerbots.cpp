@@ -20,6 +20,9 @@
 #include "PlayerbotMgr.h"
 #include "RandomPlayerbotMgr.h"
 #include "ScriptMgr.h"
+#include "Playerbots.h"
+#include "PlayerbotAI.h"
+#include "Value.h"
 
 using namespace Acore::ChatCommands;
 
@@ -207,6 +210,7 @@ public:
             return false;
         }
     }
+
 };
 
 void AddSC_playerbots_commandscript() { new playerbots_commandscript(); }

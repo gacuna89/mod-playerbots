@@ -102,7 +102,25 @@ bool LfgJoinAction::JoinLFG()
     LfgDungeonSet list;
     std::vector<uint32> selected;
 
-    std::vector<uint32> dungeons = sRandomPlayerbotMgr->LfgDungeons[bot->GetTeamId()];
+    // Allow cross-faction dungeons if cross-faction is enabled
+    std::vector<uint32> dungeons;
+    bool crossFactionEnabled = sWorld->getBoolConfig(CONFIG_ALLOW_CROSSFACTION_DUNGEON);
+    
+    
+    if (crossFactionEnabled)
+    {
+        // Combine dungeons from both factions for cross-faction support
+        dungeons = sRandomPlayerbotMgr->LfgDungeons[TEAM_ALLIANCE];
+        std::vector<uint32> hordeDungeons = sRandomPlayerbotMgr->LfgDungeons[TEAM_HORDE];
+        dungeons.insert(dungeons.end(), hordeDungeons.begin(), hordeDungeons.end());
+        
+    }
+    else
+    {
+        dungeons = sRandomPlayerbotMgr->LfgDungeons[bot->GetTeamId()];
+        
+    }
+    
     if (!dungeons.size())
         return false;
 
