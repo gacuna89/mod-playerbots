@@ -466,9 +466,6 @@ bool CastCreateFirestoneAction::isUseful()
 
 bool CastRitualOfSoulsAction::isUseful()
 {
-    Player* bot = botAI->GetBot();
-    
-    
     if (!CanUseRituals(bot))
     {
         return false;
@@ -549,8 +546,6 @@ bool CastRitualOfSoulsAction::isUseful()
 
 bool CastRitualOfSoulsAction::Execute(Event event)
 {
-    Player* bot = botAI->GetBot();
-
     // Check if bot is currently channeling the ritual
     if (bot->GetCurrentSpell(CURRENT_CHANNELED_SPELL))
     {

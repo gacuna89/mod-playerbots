@@ -376,8 +376,5 @@ bool LootSoulwellTrigger::IsActive()
     if (!soulwell)
         soulwell = bot->FindNearestGameObject(193171, 30.0f); // Soul Well Rank 2 variant
     
-    if (!soulwell)
-        return false;
-    
-    return true;
+    return soulwell;
 }

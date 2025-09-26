@@ -373,6 +373,5 @@ public:
     bool IsActive() override;
 };
 
-// SoulPortalAvailableTrigger is now defined in RitualActions.h
 
 #endif

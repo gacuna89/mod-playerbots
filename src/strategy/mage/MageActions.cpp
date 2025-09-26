@@ -165,14 +165,14 @@ bool CastBlinkBackAction::Execute(Event event)
 // Helper function to detect which ritual spell the bot has
 uint32 CastRitualOfRefreshmentAction::GetBotRitualSpellId(Player* bot)
 {
-    uint32 spellId1 = 43987; // Ritual of Refreshment Rank 1
-    uint32 spellId2 = 58659; // Ritual of Refreshment Rank 2
+    const uint32 RITUAL_REFRESHMENT_RANK_1 = 43987;
+    const uint32 RITUAL_REFRESHMENT_RANK_2 = 58659;
     
     // Prefer higher rank if available
-    if (bot->HasSpell(spellId2)) {
-        return spellId2;
-    } else if (bot->HasSpell(spellId1)) {
-        return spellId1;
+    if (bot->HasSpell(RITUAL_REFRESHMENT_RANK_2)) {
+        return RITUAL_REFRESHMENT_RANK_2;
+    } else if (bot->HasSpell(RITUAL_REFRESHMENT_RANK_1)) {
+        return RITUAL_REFRESHMENT_RANK_1;
     }
     
     return 0; // No ritual spell found
@@ -180,12 +180,11 @@ uint32 CastRitualOfRefreshmentAction::GetBotRitualSpellId(Player* bot)
 
 bool CastRitualOfRefreshmentAction::isUseful()
 {
-    Player* bot = botAI->GetBot();
-    
-    
     // Detect which rank the bot has
     uint32 botSpellId = GetBotRitualSpellId(bot);
-    std::string spellRank = (botSpellId == 58659) ? "Rank 2" : (botSpellId == 43987) ? "Rank 1" : "None";
+    const uint32 RITUAL_REFRESHMENT_RANK_1 = 43987;
+    const uint32 RITUAL_REFRESHMENT_RANK_2 = 58659;
+    std::string spellRank = (botSpellId == RITUAL_REFRESHMENT_RANK_2) ? "Rank 2" : (botSpellId == RITUAL_REFRESHMENT_RANK_1) ? "Rank 1" : "None";
     
     
     // Check base class first
@@ -258,16 +257,18 @@ bool CastRitualOfRefreshmentAction::isUseful()
         }
     }
     
-        if (!HasRitualComponent(bot, 43987))
+    if (!HasRitualComponent(bot, RITUAL_REFRESHMENT_RANK_1))
     {
         // Give Arcane Powder to bot (item ID 17020) - 2 units required
         bot->AddItem(17020, 2);
     }
     
     // Check if already has refreshment table nearby
-    GameObject* existingTable = bot->FindNearestGameObject(186812, 30.0f); // Refreshment Table Rank 1
+    const uint32 REFRESHMENT_TABLE_RANK_1 = 186812;
+    const uint32 REFRESHMENT_TABLE_RANK_2 = 193061;
+    GameObject* existingTable = bot->FindNearestGameObject(REFRESHMENT_TABLE_RANK_1, 30.0f);
     if (!existingTable)
-        existingTable = bot->FindNearestGameObject(193061, 30.0f); // Refreshment Table Rank 2
+        existingTable = bot->FindNearestGameObject(REFRESHMENT_TABLE_RANK_2, 30.0f);
     
     if (existingTable)
     {
@@ -306,7 +307,9 @@ bool CastRitualOfRefreshmentAction::Execute(Event event)
     
     // Detect which rank the bot has
     uint32 botSpellId = GetBotRitualSpellId(bot);
-    std::string spellRank = (botSpellId == 58659) ? "Rank 2" : (botSpellId == 43987) ? "Rank 1" : "None";
+    const uint32 RITUAL_REFRESHMENT_RANK_1 = 43987;
+    const uint32 RITUAL_REFRESHMENT_RANK_2 = 58659;
+    std::string spellRank = (botSpellId == RITUAL_REFRESHMENT_RANK_2) ? "Rank 2" : (botSpellId == RITUAL_REFRESHMENT_RANK_1) ? "Rank 1" : "None";
     
     if (botSpellId == 0)
     {
