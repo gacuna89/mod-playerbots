@@ -894,6 +894,7 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
     {
         messages.push_back("usage: list/reload/tweak/self or add/addaccount/init/remove PLAYERNAME\n");
         messages.push_back("usage: addclass CLASSNAME [male|female|0|1]");
+        messages.push_back("usage: assist on/off");
         return messages;
     }
 
@@ -903,7 +904,7 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
 
     if (!cmd)
     {
-        messages.push_back("usage: list/reload/tweak/self or add/init/remove PLAYERNAME or addclass CLASSNAME [male|female]");
+        messages.push_back("usage: list/reload/tweak/self or add/init/remove PLAYERNAME or addclass CLASSNAME [male|female] or assist on/off");
         return messages;
     }
 
@@ -1168,6 +1169,80 @@ std::vector<std::string> PlayerbotHolder::HandlePlayerbotCommand(char const* arg
             return messages;
         }
         messages.push_back("Add class failed, no available characters!");
+        return messages;
+    }
+
+    if (!strcmp(cmd, "assist"))
+    {
+        if (!charname)
+        {
+            messages.push_back("usage: assist on/off");
+            return messages;
+        }
+        
+        std::string action = charname;
+        
+        if (action == "on")
+        {
+            // Activar modo assist para todos los bots del grupo
+            if (master && master->GetGroup())
+            {
+                for (GroupReference* ref = master->GetGroup()->GetFirstMember(); ref; ref = ref->next())
+                {
+                    Player* member = ref->GetSource();
+                    if (member == master)
+                        continue;
+                    
+                    PlayerbotAI* botAI = GET_PLAYERBOT_AI(member);
+                    if (botAI && botAI->GetAiObjectContext())
+                    {
+                        auto assistModeValue = botAI->GetAiObjectContext()->GetValue<bool>("assist mode");
+                        if (assistModeValue)
+                        {
+                            assistModeValue->Set(true);
+                        }
+                    }
+                }
+                messages.push_back("Modo assist activado para todos los bots del grupo.");
+            }
+            else
+            {
+                messages.push_back("Debes estar en un grupo para usar el comando assist.");
+            }
+        }
+        else if (action == "off")
+        {
+            // Desactivar modo assist para todos los bots del grupo
+            if (master && master->GetGroup())
+            {
+                for (GroupReference* ref = master->GetGroup()->GetFirstMember(); ref; ref = ref->next())
+                {
+                    Player* member = ref->GetSource();
+                    if (member == master)
+                        continue;
+                    
+                    PlayerbotAI* botAI = GET_PLAYERBOT_AI(member);
+                    if (botAI && botAI->GetAiObjectContext())
+                    {
+                        auto assistModeValue = botAI->GetAiObjectContext()->GetValue<bool>("assist mode");
+                        if (assistModeValue)
+                        {
+                            assistModeValue->Set(false);
+                        }
+                    }
+                }
+                messages.push_back("Modo assist desactivado para todos los bots del grupo.");
+            }
+            else
+            {
+                messages.push_back("Debes estar en un grupo para usar el comando assist.");
+            }
+        }
+        else
+        {
+            messages.push_back("usage: assist on/off");
+        }
+        
         return messages;
     }
 
