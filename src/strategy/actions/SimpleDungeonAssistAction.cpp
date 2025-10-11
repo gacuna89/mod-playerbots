@@ -220,6 +220,15 @@ void SimpleDungeonAssistAction::MoveToNextBoss()
     
     LOG_ERROR("playerbots", "DEBUG: Encontrados {} bosses en el dungeon", bossEntries.size());
     
+    // Mostrar el orden de los bosses
+    std::string bossOrder = "Orden de bosses: ";
+    for (size_t i = 0; i < bossEntries.size(); ++i)
+    {
+        bossOrder += std::to_string(bossEntries[i]);
+        if (i < bossEntries.size() - 1) bossOrder += ", ";
+    }
+    LOG_ERROR("playerbots", "DEBUG: {}", bossOrder);
+    
     // Contar bosses muertos y vivos para mejor logging
     int deadBosses = 0;
     int aliveBosses = 0;
@@ -254,10 +263,10 @@ void SimpleDungeonAssistAction::MoveToNextBoss()
         return;
     }
     
-    // Intentar moverse al primer boss vivo encontrado
+    // Intentar moverse al primer boss vivo en orden secuencial
     if (firstAliveBoss != 0)
     {
-        LOG_ERROR("playerbots", "DEBUG: Intentando mover al primer boss vivo: {}", firstAliveBoss);
+        LOG_ERROR("playerbots", "DEBUG: Intentando mover al primer boss vivo en orden: {}", firstAliveBoss);
         
         // Verificar si ya estamos moviéndonos hacia este boss
         if (bot->GetMotionMaster()->GetCurrentMovementGeneratorType() == POINT_MOTION_TYPE && lastTargetBoss == firstAliveBoss)
@@ -268,7 +277,7 @@ void SimpleDungeonAssistAction::MoveToNextBoss()
         
         if (MoveToBoss(firstAliveBoss))
         {
-            LOG_ERROR("playerbots", "DEBUG: Éxito moviendo al boss {}", firstAliveBoss);
+            LOG_ERROR("playerbots", "DEBUG: Éxito moviendo al boss {} (Sneed debería ser el siguiente después de Rhahk'Zor)", firstAliveBoss);
             return; // Exitosamente empezó a moverse al boss
         }
         else
@@ -613,7 +622,7 @@ std::vector<uint32> SimpleDungeonAssistAction::GetDungeonBosses(uint32 mapId)
     // En el futuro se puede crear una tabla con información de dungeons
     if (mapId == 36) // Deadmines
     {
-        bosses = {644, 643, 646, 645, 647, 1763, 639}; // Rhahk'Zor, Sneed, Mr. Smite, Cookie, Gilnid, Captain Greenskin, Edwin VanCleef
+        bosses = {644, 642, 643, 646, 645, 647, 1763, 639}; // Rhahk'Zor, Sneed, Mr. Smite, Cookie, Gilnid, Captain Greenskin, Edwin VanCleef
     }
     
     return bosses;
