@@ -149,29 +149,68 @@ bool SimpleDungeonAssistAction::IsDeadmines()
 
 bool SimpleDungeonAssistAction::IsBossDead(uint32 bossEntry)
 {
-    // Verificar si el boss está muerto dentro de 200 yardas
+    // Verificar si el boss está muerto dentro de 500 yardas (aumentado para mejor detección)
     std::list<Creature*> creatures;
-    bot->GetCreatureListWithEntryInGrid(creatures, bossEntry, 200.0f);
+    bot->GetCreatureListWithEntryInGrid(creatures, bossEntry, 500.0f);
     
     bool foundBoss = false;
+    bool foundAliveBoss = false;
+    
     for (Creature* creature : creatures)
     {
         if (creature)
         {
-            foundBoss = true; // Encontramos el boss
+            foundBoss = true;
+            LOG_ERROR("playerbots", "DEBUG: Encontrado boss {} - Estado: {}", creature->GetName(), creature->IsAlive() ? "VIVO" : "MUERTO");
+            
             if (creature->IsAlive())
             {
-                return false; // Boss está vivo
-            }
-            else
-            {
-                return true; // Boss está muerto
+                foundAliveBoss = true;
+                // Si encontramos un boss vivo, definitivamente no está muerto
+                return false;
             }
         }
     }
     
-    // Si no encontramos el boss en 200 yardas, asumir que está vivo pero lejos
-    return false; // Boss no encontrado = asumir vivo
+    // Si encontramos el boss pero no está vivo, está muerto
+    if (foundBoss && !foundAliveBoss)
+    {
+        LOG_ERROR("playerbots", "DEBUG: Boss {} encontrado pero muerto", bossEntry);
+        return true;
+    }
+    
+    // Si no encontramos el boss en 500 yardas, verificar si está en el dungeon pero más lejos
+    // Esto puede indicar que el boss ya fue derrotado y no se ha respawneado
+    if (!foundBoss)
+    {
+        // Buscar en un radio más amplio para verificar si existe
+        std::list<Creature*> allCreatures;
+        bot->GetCreatureListWithEntryInGrid(allCreatures, bossEntry, 2000.0f);
+        
+        bool existsInDungeon = false;
+        for (Creature* creature : allCreatures)
+        {
+            if (creature)
+            {
+                existsInDungeon = true;
+                if (creature->IsAlive())
+                {
+                    LOG_ERROR("playerbots", "DEBUG: Boss {} encontrado vivo a {} yardas", bossEntry, (int)bot->GetDistance(creature));
+                    return false; // Boss está vivo pero lejos
+                }
+            }
+        }
+        
+        if (!existsInDungeon)
+        {
+            LOG_ERROR("playerbots", "DEBUG: Boss {} no encontrado en el dungeon - posiblemente derrotado", bossEntry);
+            return true; // Boss no existe = asumir derrotado
+        }
+    }
+    
+    // Por defecto, asumir que está vivo si no podemos determinar su estado
+    LOG_ERROR("playerbots", "DEBUG: No se pudo determinar el estado del boss {}, asumiendo vivo", bossEntry);
+    return false;
 }
 
 void SimpleDungeonAssistAction::MoveToNextBoss()
@@ -181,46 +220,80 @@ void SimpleDungeonAssistAction::MoveToNextBoss()
     
     LOG_ERROR("playerbots", "DEBUG: Encontrados {} bosses en el dungeon", bossEntries.size());
     
+    // Contar bosses muertos y vivos para mejor logging
+    int deadBosses = 0;
+    int aliveBosses = 0;
+    uint32 firstAliveBoss = 0;
+    
     for (uint32 bossEntry : bossEntries)
     {
         LOG_ERROR("playerbots", "DEBUG: Verificando boss ID: {}", bossEntry);
         
-        if (!IsBossDead(bossEntry))
+        if (IsBossDead(bossEntry))
         {
-            LOG_ERROR("playerbots", "DEBUG: Boss {} no está muerto, intentando mover", bossEntry);
-            if (MoveToBoss(bossEntry))
-            {
-                return; // Exitosamente empezó a moverse al boss
-            }
-            // Si no puede moverse al boss, continúa con el siguiente
+            deadBosses++;
+            LOG_ERROR("playerbots", "DEBUG: Boss {} ya está muerto", bossEntry);
         }
         else
         {
-            LOG_ERROR("playerbots", "DEBUG: Boss {} ya está muerto", bossEntry);
+            aliveBosses++;
+            if (firstAliveBoss == 0)
+            {
+                firstAliveBoss = bossEntry;
+            }
+            LOG_ERROR("playerbots", "DEBUG: Boss {} está vivo", bossEntry);
         }
     }
     
-    // Si no hay bosses disponibles, verificar si ya terminamos el dungeon
-    bool allBossesDead = true;
-    for (uint32 bossEntry : bossEntries)
-    {
-        if (!IsBossDead(bossEntry))
-        {
-            allBossesDead = false;
-            break;
-        }
-    }
+    LOG_ERROR("playerbots", "DEBUG: Resumen - Bosses muertos: {}, Bosses vivos: {}", deadBosses, aliveBosses);
     
-    if (allBossesDead)
+    // Si todos los bosses están muertos
+    if (aliveBosses == 0)
     {
         SayMessage("¡Dungeon completado! Todos los bosses han sido derrotados.");
+        return;
     }
-    else
+    
+    // Intentar moverse al primer boss vivo encontrado
+    if (firstAliveBoss != 0)
     {
-        SayMessage("No hay bosses accesibles en este nivel. Esperando progresión del dungeon...");
-        // En lugar de buscar indefinidamente, esperar a que el jugador progrese
-        return; // Salir de la función para evitar bucle infinito
+        LOG_ERROR("playerbots", "DEBUG: Intentando mover al primer boss vivo: {}", firstAliveBoss);
+        
+        // Verificar si ya estamos moviéndonos hacia este boss
+        if (bot->GetMotionMaster()->GetCurrentMovementGeneratorType() == POINT_MOTION_TYPE && lastTargetBoss == firstAliveBoss)
+        {
+            LOG_ERROR("playerbots", "DEBUG: Ya estamos en movimiento hacia el boss {}", firstAliveBoss);
+            return; // Ya estamos en movimiento, no interrumpir
+        }
+        
+        if (MoveToBoss(firstAliveBoss))
+        {
+            LOG_ERROR("playerbots", "DEBUG: Éxito moviendo al boss {}", firstAliveBoss);
+            return; // Exitosamente empezó a moverse al boss
+        }
+        else
+        {
+            LOG_ERROR("playerbots", "DEBUG: Falló al mover al boss {}", firstAliveBoss);
+        }
     }
+    
+    // Si no pudo moverse al primer boss, intentar con otros bosses vivos
+    for (uint32 bossEntry : bossEntries)
+    {
+        if (!IsBossDead(bossEntry) && bossEntry != firstAliveBoss)
+        {
+            LOG_ERROR("playerbots", "DEBUG: Intentando boss alternativo: {}", bossEntry);
+            if (MoveToBoss(bossEntry))
+            {
+                LOG_ERROR("playerbots", "DEBUG: Éxito moviendo al boss alternativo {}", bossEntry);
+                return;
+            }
+        }
+    }
+    
+    // Si no pudo moverse a ningún boss
+    SayMessage("No puedo acceder a ningún boss en este momento. Esperando...");
+    LOG_ERROR("playerbots", "DEBUG: No se pudo acceder a ningún boss vivo");
 }
 
 bool SimpleDungeonAssistAction::MoveToBoss(uint32 bossEntry)
@@ -260,6 +333,13 @@ bool SimpleDungeonAssistAction::MoveToBoss(uint32 bossEntry)
             // Verificar si el boss es accesible
             bool isBossAccessible = IsBossAccessible(creature);
             
+            // Verificar estado del bot antes de intentar movimiento (como Warsong)
+            if (bot->IsNonMeleeSpellCast(false, true, true, false, true))
+            {
+                LOG_ERROR("playerbots", "DEBUG: Bot está casteando, interrumpiendo para moverse");
+                bot->InterruptNonMeleeSpells(true);
+            }
+            
             if (distanceToBoss <= 10.0f && bot->IsWithinLOS(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ()))
             {
                 // Muy cerca y con línea de visión - movimiento directo
@@ -291,6 +371,17 @@ bool SimpleDungeonAssistAction::MoveToBoss(uint32 bossEntry)
                 
                 if (losBlocked)
                 {
+                    // Interrumpir hechizos si está casteando (como Warsong)
+                    if (bot->IsNonMeleeSpellCast(false, true, true, false, true))
+                    {
+                        bot->InterruptNonMeleeSpells(true);
+                        LOG_ERROR("playerbots", "DEBUG: Interrumpido hechizo para reposicionarse");
+                    }
+                    
+                    // FORZAR movimiento incluso con LOS bloqueado - intentar múltiples estrategias
+                    LOG_ERROR("playerbots", "DEBUG: LOS bloqueado pero FORZANDO movimiento hacia el boss");
+                    
+                    // Estrategia 1: Intentar pathfinding normal primero
                     PathGenerator path(bot);
                     path.CalculatePath(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), false);
                     
@@ -302,8 +393,26 @@ bool SimpleDungeonAssistAction::MoveToBoss(uint32 bossEntry)
                     }
                     else
                     {
-                        LOG_ERROR("playerbots", "DEBUG: PathGenerator no encontró camino (PATHFIND_NOPATH)");
-                        canMove = false;
+                        LOG_ERROR("playerbots", "DEBUG: PathGenerator falló, intentando movimiento directo forzado");
+                        
+                        // Estrategia 2: Movimiento directo forzado (ignorar pathfinding)
+                        // Esto es útil cuando el pathfinding falla pero el bot puede moverse directamente
+                        canMove = MoveTo(targetLocation.GetMapId(), targetLocation.GetPositionX(), targetLocation.GetPositionY(), targetLocation.GetPositionZ(), true, false); // true = forzar
+                        LOG_ERROR("playerbots", "DEBUG: MoveTo forzado resultado: {}", canMove ? "ÉXITO" : "FALLO");
+                        
+                        // Estrategia 3: Si falla, intentar acercarse gradualmente
+                        if (!canMove)
+                        {
+                            LOG_ERROR("playerbots", "DEBUG: Movimiento forzado falló, intentando acercamiento gradual");
+                            
+                            // Calcular punto intermedio más cercano al bot
+                            float midX = bot->GetPositionX() + (creature->GetPositionX() - bot->GetPositionX()) * 0.5f;
+                            float midY = bot->GetPositionY() + (creature->GetPositionY() - bot->GetPositionY()) * 0.5f;
+                            float midZ = bot->GetPositionZ() + (creature->GetPositionZ() - bot->GetPositionZ()) * 0.3f; // Menos cambio en Z
+                            
+                            canMove = MoveTo(targetLocation.GetMapId(), midX, midY, midZ, true, false);
+                            LOG_ERROR("playerbots", "DEBUG: Acercamiento gradual resultado: {}", canMove ? "ÉXITO" : "FALLO");
+                        }
                     }
                 }
                 else
@@ -318,22 +427,30 @@ bool SimpleDungeonAssistAction::MoveToBoss(uint32 bossEntry)
                 {
                     LOG_ERROR("playerbots", "DEBUG: MoveTo falló, intentando estrategias alternativas...");
                     
-                    // Estrategia 1: Punto intermedio
+                    // Estrategia 1: Punto intermedio con variación aleatoria (como Warsong)
                     float midX = (bot->GetPositionX() + creature->GetPositionX()) / 2.0f;
                     float midY = (bot->GetPositionY() + creature->GetPositionY()) / 2.0f;
                     float midZ = (bot->GetPositionZ() + creature->GetPositionZ()) / 2.0f;
                     
-                    LOG_ERROR("playerbots", "DEBUG: Intentando punto intermedio...");
+                    // Añadir pequeña variación aleatoria para evitar bucles exactos
+                    midX += frand(-1.0f, 1.0f);
+                    midY += frand(-1.0f, 1.0f);
+                    
+                    LOG_ERROR("playerbots", "DEBUG: Intentando punto intermedio con variación...");
                     canMove = MoveTo(targetLocation.GetMapId(), midX, midY, midZ, false, false);
                     LOG_ERROR("playerbots", "DEBUG: MoveTo intermedio resultado: {}", canMove ? "ÉXITO" : "FALLO");
                     
-                    // Estrategia 2: Si falla, intentar acercarse más al bot
+                    // Estrategia 2: Si falla, intentar acercarse más al bot con variación
                     if (!canMove)
                     {
-                        LOG_ERROR("playerbots", "DEBUG: Intentando acercarse más al bot...");
+                        LOG_ERROR("playerbots", "DEBUG: Intentando acercarse más al bot con variación...");
                         float closerX = bot->GetPositionX() + (creature->GetPositionX() - bot->GetPositionX()) * 0.3f;
                         float closerY = bot->GetPositionY() + (creature->GetPositionY() - bot->GetPositionY()) * 0.3f;
                         float closerZ = bot->GetPositionZ() + (creature->GetPositionZ() - bot->GetPositionZ()) * 0.3f;
+                        
+                        // Añadir variación aleatoria
+                        closerX += frand(-0.5f, 0.5f);
+                        closerY += frand(-0.5f, 0.5f);
                         
                         canMove = MoveTo(targetLocation.GetMapId(), closerX, closerY, closerZ, false, false);
                         LOG_ERROR("playerbots", "DEBUG: MoveTo cercano resultado: {}", canMove ? "ÉXITO" : "FALLO");
@@ -347,20 +464,43 @@ bool SimpleDungeonAssistAction::MoveToBoss(uint32 bossEntry)
                 canMove = false; // Forzar búsqueda de siguiente boss
             }
             
-            // Sistema de retry simplificado
+            // Sistema de retry más persistente
             if (!canMove)
             {
                 retryCount++;
-                if (retryCount >= maxRetries)
+                LOG_ERROR("playerbots", "DEBUG: Intento de movimiento falló, retry {}/{}", retryCount, maxRetries);
+                
+                // Aumentar el número máximo de reintentos para ser más persistente
+                uint32 persistentMaxRetries = maxRetries * 2; // Doblar los reintentos
+                
+                if (retryCount >= persistentMaxRetries)
                 {
-                    SayMessage("No puedo llegar al boss, intentando siguiente objetivo...");
+                    SayMessage("Persistencia agotada con " + creature->GetName() + ", intentando siguiente objetivo...");
+                    LOG_ERROR("playerbots", "DEBUG: Máximo de reintentos persistente alcanzado para boss {}", bossEntry);
                     retryCount = 0;
                     return false; // Intentar siguiente boss
+                }
+                
+                // Esperar menos tiempo entre reintentos para ser más agresivo
+                botAI->SetNextCheckDelay(1000); // 1 segundo en lugar de 2
+                
+                // Intentar una estrategia diferente en cada retry
+                if (retryCount % 2 == 0)
+                {
+                    LOG_ERROR("playerbots", "DEBUG: Retry par, intentando movimiento más agresivo");
+                    // En retries pares, intentar movimiento más directo
+                    float aggressiveX = bot->GetPositionX() + (creature->GetPositionX() - bot->GetPositionX()) * 0.7f;
+                    float aggressiveY = bot->GetPositionY() + (creature->GetPositionY() - bot->GetPositionY()) * 0.7f;
+                    float aggressiveZ = bot->GetPositionZ() + (creature->GetPositionZ() - bot->GetPositionZ()) * 0.5f;
+                    
+                    canMove = MoveTo(targetLocation.GetMapId(), aggressiveX, aggressiveY, aggressiveZ, true, false);
+                    LOG_ERROR("playerbots", "DEBUG: Movimiento agresivo resultado: {}", canMove ? "ÉXITO" : "FALLO");
                 }
             }
             else
             {
                 retryCount = 0; // Reset retry count on success
+                LOG_ERROR("playerbots", "DEBUG: Movimiento exitoso hacia boss {}", bossEntry);
             }
             
             return canMove;
