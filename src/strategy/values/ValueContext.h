@@ -161,6 +161,7 @@ public:
         creators["has aggro"] = &ValueContext::has_aggro;
         creators["mounted"] = &ValueContext::mounted;
         creators["custom_glyphs"] = &ValueContext::custom_glyphs;   // Added for custom glyphs
+        creators["assist mode"] = &ValueContext::assist_mode;       // Added for dungeon assist mode
 
         creators["can loot"] = &ValueContext::can_loot;
         creators["loot target"] = &ValueContext::loot_target;
@@ -561,6 +562,14 @@ private:
     static UntypedValue* custom_glyphs(PlayerbotAI* ai)
     {
         return new ManualSetValue<bool>(ai, false, "custom_glyphs");
+    }
+    
+    // -------------------------------------------------------
+    // Flag for assist mode : true when playerbots bot assist on
+    // -------------------------------------------------------
+    static UntypedValue* assist_mode(PlayerbotAI* ai)
+    {
+        return new ManualSetValue<bool>(ai, false, "assist mode");
     }
 };
 

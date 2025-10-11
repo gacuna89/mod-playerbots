@@ -7,6 +7,7 @@
 #include "Playerbots.h"
 #include "LootObjectStack.h"
 #include "PathGenerator.h"
+#include "Log.h"
 
 bool SimpleDungeonAssistAction::isUseful()
 {
@@ -50,27 +51,58 @@ bool SimpleDungeonAssistAction::isUseful()
 
 bool SimpleDungeonAssistAction::Execute(Event event)
 {
-    // Verificar si el jugador está en rango (20 yardas)
+    // Primero intentar moverse hacia el boss
+    MoveToNextBoss();
+    
+    // DESPUÉS verificar si el jugador está en rango (20 yardas)
     if (!IsPlayerInRange())
     {
-        SayMessage("¡Héroe! ¿Dónde estás? ¡Te necesito!");
-        return false; // Esperar al jugador
+        SayMessage("No te alejes, sígueme");
+        // Detener cualquier movimiento actual
+        bot->GetMotionMaster()->Clear();
+        return false; // Esperar al jugador (NO regresar)
     }
     
-    // Verificar si hay demasiados enemigos (2+)
-    int enemyCount = 0;
+    // Verificar combate y decidir si continuar o detenerse
     if (bot->IsInCombat())
     {
+        int enemyCount = 0;
+        bool hasBoss = false;
+        bool isLowHealth = bot->GetHealthPct() < 50; // Salud baja
+        
         for (Unit* attacker : bot->getAttackers())
         {
             if (attacker && attacker->IsAlive() && attacker->IsInCombat())
+            {
                 enemyCount++;
+                // Verificar si alguno de los atacantes es un boss
+                if (attacker->ToCreature() && attacker->ToCreature()->IsDungeonBoss())
+                {
+                    hasBoss = true;
+                }
+            }
         }
         
-        if (enemyCount >= 2)
+        // Detenerse si hay un boss
+        if (hasBoss)
         {
-            SayMessage("Demasiados enemigos, limpiando...");
+            SayMessage("¡Boss detectado! Enfocando...");
+            return false; // Parar para combatir boss
+        }
+        // Detenerse si hay muchos enemigos (3+) o salud baja
+        else if (enemyCount >= 3 || isLowHealth)
+        {
+            if (isLowHealth)
+                SayMessage("Salud baja, limpiando enemigos...");
+            else
+                SayMessage("Demasiados enemigos, limpiando...");
             return false; // Parar para limpiar
+        }
+        // Con pocos enemigos y salud buena, continuar pero con precaución
+        else if (enemyCount > 0)
+        {
+            SayMessage("Pocos enemigos, continuando con precaución...");
+            // Continuar pero ser más cuidadoso
         }
     }
     
@@ -121,15 +153,25 @@ bool SimpleDungeonAssistAction::IsBossDead(uint32 bossEntry)
     std::list<Creature*> creatures;
     bot->GetCreatureListWithEntryInGrid(creatures, bossEntry, 200.0f);
     
+    bool foundBoss = false;
     for (Creature* creature : creatures)
     {
-        if (creature && creature->IsAlive())
+        if (creature)
         {
-            return false; // Boss está vivo
+            foundBoss = true; // Encontramos el boss
+            if (creature->IsAlive())
+            {
+                return false; // Boss está vivo
+            }
+            else
+            {
+                return true; // Boss está muerto
+            }
         }
     }
     
-    return true; // Boss está muerto o no encontrado
+    // Si no encontramos el boss en 200 yardas, asumir que está vivo pero lejos
+    return false; // Boss no encontrado = asumir vivo
 }
 
 void SimpleDungeonAssistAction::MoveToNextBoss()
@@ -137,23 +179,24 @@ void SimpleDungeonAssistAction::MoveToNextBoss()
     // Obtener bosses del dungeon actual dinámicamente
     std::vector<uint32> bossEntries = GetDungeonBosses(bot->GetMapId());
     
+    LOG_ERROR("playerbots", "DEBUG: Encontrados {} bosses en el dungeon", bossEntries.size());
+    
     for (uint32 bossEntry : bossEntries)
     {
+        LOG_ERROR("playerbots", "DEBUG: Verificando boss ID: {}", bossEntry);
+        
         if (!IsBossDead(bossEntry))
         {
+            LOG_ERROR("playerbots", "DEBUG: Boss {} no está muerto, intentando mover", bossEntry);
             if (MoveToBoss(bossEntry))
             {
                 return; // Exitosamente empezó a moverse al boss
             }
-            else
-            {
-                // No pudo moverse al boss directamente, intentar con waypoints
-                SayMessage("Usando waypoints para navegar...");
-                if (MoveToNextWaypoint())
-                {
-                    return; // Exitosamente empezó a moverse a un waypoint
-                }
-            }
+            // Si no puede moverse al boss, continúa con el siguiente
+        }
+        else
+        {
+            LOG_ERROR("playerbots", "DEBUG: Boss {} ya está muerto", bossEntry);
         }
     }
     
@@ -174,7 +217,9 @@ void SimpleDungeonAssistAction::MoveToNextBoss()
     }
     else
     {
-        SayMessage("Buscando siguiente objetivo...");
+        SayMessage("No hay bosses accesibles en este nivel. Esperando progresión del dungeon...");
+        // En lugar de buscar indefinidamente, esperar a que el jugador progrese
+        return; // Salir de la función para evitar bucle infinito
     }
 }
 
@@ -199,7 +244,8 @@ bool SimpleDungeonAssistAction::MoveToBoss(uint32 bossEntry)
             uint32 currentTime = getMSTime();
             if (lastTargetBoss != bossEntry || (currentTime - lastMessageTime) > 10000)
             {
-                SayMessage("Dirigiendo al boss: " + creature->GetName());
+                float distance = bot->GetDistance(creature);
+                SayMessage("Dirigiendo al boss: " + creature->GetName() + " (Distancia: " + std::to_string((int)distance) + " yardas)");
                 lastTargetBoss = bossEntry;
                 lastMessageTime = currentTime;
             }
@@ -211,36 +257,97 @@ bool SimpleDungeonAssistAction::MoveToBoss(uint32 bossEntry)
             bool canMove = false;
             float distanceToBoss = bot->GetDistance(creature);
             
-            // Verificar si hay un camino válido al boss
-            bool hasPath = FindPathToBoss(creature);
+            // Verificar si el boss es accesible
+            bool isBossAccessible = IsBossAccessible(creature);
             
             if (distanceToBoss <= 10.0f && bot->IsWithinLOS(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ()))
             {
                 // Muy cerca y con línea de visión - movimiento directo
+                LOG_ERROR("playerbots", "DEBUG: Usando MoveNear (muy cerca)");
                 canMove = MoveNear(targetLocation.GetMapId(), targetLocation.GetPositionX(), targetLocation.GetPositionY(), targetLocation.GetPositionZ(), 0);
+                LOG_ERROR("playerbots", "DEBUG: MoveNear resultado: {}", canMove ? "ÉXITO" : "FALLO");
             }
-            else if (hasPath)
+            else if (isBossAccessible)
             {
-                // Hay un camino válido - usar pathfinding
-                canMove = MoveTo(targetLocation.GetMapId(), targetLocation.GetPositionX(), targetLocation.GetPositionY(), targetLocation.GetPositionZ(), false, false);
+                // Boss es accesible - usar pathfinding normal
+                LOG_ERROR("playerbots", "DEBUG: Usando MoveTo (pathfinding)");
+                
+                // Debug técnico detallado
+                float botX = bot->GetPositionX();
+                float botY = bot->GetPositionY();
+                float botZ = bot->GetPositionZ();
+                float bossX = creature->GetPositionX();
+                float bossY = creature->GetPositionY();
+                float bossZ = creature->GetPositionZ();
+                
+                LOG_ERROR("playerbots", "DEBUG: Bot pos: ({}, {}, {})", (int)botX, (int)botY, (int)botZ);
+                LOG_ERROR("playerbots", "DEBUG: Boss pos: ({}, {}, {})", (int)bossX, (int)bossY, (int)bossZ);
+                LOG_ERROR("playerbots", "DEBUG: Distancia: {} yardas", (int)distanceToBoss);
+                LOG_ERROR("playerbots", "DEBUG: LOS: {}", bot->IsWithinLOS(bossX, bossY, bossZ) ? "SÍ" : "NO");
+                
+                // Usar la misma lógica que Warsong: PathGenerator con verificación
+                bool losBlocked = !bot->IsWithinLOSInMap(creature) || fabs(botZ - bossZ) > 5.0f;
+                LOG_ERROR("playerbots", "DEBUG: LOS bloqueado: {}, diferencia altura: {}", losBlocked, (int)fabs(botZ - bossZ));
+                
+                if (losBlocked)
+                {
+                    PathGenerator path(bot);
+                    path.CalculatePath(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), false);
+                    
+                    if (path.GetPathType() != PATHFIND_NOPATH)
+                    {
+                        LOG_ERROR("playerbots", "DEBUG: PathGenerator encontró camino válido");
+                        canMove = MoveTo(targetLocation.GetMapId(), targetLocation.GetPositionX(), targetLocation.GetPositionY(), targetLocation.GetPositionZ(), false, false);
+                        LOG_ERROR("playerbots", "DEBUG: MoveTo resultado: {}", canMove ? "ÉXITO" : "FALLO");
+                    }
+                    else
+                    {
+                        LOG_ERROR("playerbots", "DEBUG: PathGenerator no encontró camino (PATHFIND_NOPATH)");
+                        canMove = false;
+                    }
+                }
+                else
+                {
+                    LOG_ERROR("playerbots", "DEBUG: LOS libre, movimiento directo");
+                    canMove = MoveTo(targetLocation.GetMapId(), targetLocation.GetPositionX(), targetLocation.GetPositionY(), targetLocation.GetPositionZ(), false, false);
+                    LOG_ERROR("playerbots", "DEBUG: MoveTo resultado: {}", canMove ? "ÉXITO" : "FALLO");
+                }
+                
+                // Si MoveTo falla, intentar múltiples estrategias
+                if (!canMove)
+                {
+                    LOG_ERROR("playerbots", "DEBUG: MoveTo falló, intentando estrategias alternativas...");
+                    
+                    // Estrategia 1: Punto intermedio
+                    float midX = (bot->GetPositionX() + creature->GetPositionX()) / 2.0f;
+                    float midY = (bot->GetPositionY() + creature->GetPositionY()) / 2.0f;
+                    float midZ = (bot->GetPositionZ() + creature->GetPositionZ()) / 2.0f;
+                    
+                    LOG_ERROR("playerbots", "DEBUG: Intentando punto intermedio...");
+                    canMove = MoveTo(targetLocation.GetMapId(), midX, midY, midZ, false, false);
+                    LOG_ERROR("playerbots", "DEBUG: MoveTo intermedio resultado: {}", canMove ? "ÉXITO" : "FALLO");
+                    
+                    // Estrategia 2: Si falla, intentar acercarse más al bot
+                    if (!canMove)
+                    {
+                        LOG_ERROR("playerbots", "DEBUG: Intentando acercarse más al bot...");
+                        float closerX = bot->GetPositionX() + (creature->GetPositionX() - bot->GetPositionX()) * 0.3f;
+                        float closerY = bot->GetPositionY() + (creature->GetPositionY() - bot->GetPositionY()) * 0.3f;
+                        float closerZ = bot->GetPositionZ() + (creature->GetPositionZ() - bot->GetPositionZ()) * 0.3f;
+                        
+                        canMove = MoveTo(targetLocation.GetMapId(), closerX, closerY, closerZ, false, false);
+                        LOG_ERROR("playerbots", "DEBUG: MoveTo cercano resultado: {}", canMove ? "ÉXITO" : "FALLO");
+                    }
+                }
             }
             else
             {
-                // No hay camino directo - intentar acercarse gradualmente
-                // Buscar un punto intermedio más cercano
-                float midX = (bot->GetPositionX() + creature->GetPositionX()) / 2.0f;
-                float midY = (bot->GetPositionY() + creature->GetPositionY()) / 2.0f;
-                float midZ = (bot->GetPositionZ() + creature->GetPositionZ()) / 2.0f;
-                
-                canMove = MoveTo(targetLocation.GetMapId(), midX, midY, midZ, false, false);
-                
-                if (canMove)
-                {
-                    SayMessage("Navegando por el camino disponible...");
-                }
+                // Boss no es accesible - buscar boss alternativo o esperar
+                SayMessage("Boss no accesible, buscando alternativa...");
+                canMove = false; // Forzar búsqueda de siguiente boss
             }
             
-            // Sistema de retry como Travel
+            // Sistema de retry simplificado
             if (!canMove)
             {
                 retryCount++;
@@ -249,11 +356,6 @@ bool SimpleDungeonAssistAction::MoveToBoss(uint32 bossEntry)
                     SayMessage("No puedo llegar al boss, intentando siguiente objetivo...");
                     retryCount = 0;
                     return false; // Intentar siguiente boss
-                }
-                else
-                {
-                    SayMessage("Intentando llegar al boss... (" + std::to_string(retryCount) + "/" + std::to_string(maxRetries) + ")");
-                    return false; // Reintentar mismo boss
                 }
             }
             else
@@ -283,31 +385,48 @@ void SimpleDungeonAssistAction::SayMessage(const std::string& message)
     bot->Say(message, LANG_UNIVERSAL);
 }
 
-bool SimpleDungeonAssistAction::FindPathToBoss(Creature* boss)
+bool SimpleDungeonAssistAction::IsBossAccessible(Creature* boss)
 {
     if (!boss)
-        return false;
-    
-    // Usar PathGenerator para encontrar el camino
-    PathGenerator path(bot);
-    path.SetPathLengthLimit(500.0f); // Límite de 500 yardas
-    
-    bool result = path.CalculatePath(boss->GetPositionX(), boss->GetPositionY(), boss->GetPositionZ());
-    
-    if (result && !path.GetPath().empty())
     {
-        // El pathfinding encontró un camino
-        return true;
+        LOG_ERROR("playerbots", "DEBUG: Boss es null");
+        return false;
     }
     
-    return false;
+    // Verificar si el boss está vivo y en el mundo
+    if (boss->isDead())
+    {
+        LOG_ERROR("playerbots", "DEBUG: Boss {} está muerto", boss->GetName());
+        return false;
+    }
+    
+    if (!boss->IsInWorld())
+    {
+        LOG_ERROR("playerbots", "DEBUG: Boss {} no está en el mundo", boss->GetName());
+        return false;
+    }
+    
+    // Verificar si el boss está en la misma instancia
+    if (boss->GetInstanceId() != this->bot->GetInstanceId())
+    {
+        LOG_ERROR("playerbots", "DEBUG: Boss {} en instancia diferente", boss->GetName());
+        return false;
+    }
+    
+    // Verificar distancia razonable (máximo 2000 yardas para dungeons)
+    float directDistance = this->bot->GetDistance(boss);
+    if (directDistance > 2000.0f)
+    {
+        LOG_ERROR("playerbots", "DEBUG: Boss {} demasiado lejos ({} yardas)", boss->GetName(), (int)directDistance);
+        return false; // Demasiado lejos
+    }
+    
+    // Si está en el mismo mapa y no demasiado lejos, asumir que es accesible
+    // El pathfinding del juego se encargará de encontrar el camino
+    LOG_ERROR("playerbots", "DEBUG: Boss {} es accesible ({} yardas)", boss->GetName(), (int)directDistance);
+    return true;
 }
 
-bool SimpleDungeonAssistAction::MoveToWaypoint(const WorldLocation& waypoint)
-{
-    // Mover a un waypoint específico usando pathfinding
-    return MoveTo(waypoint.GetMapId(), waypoint.GetPositionX(), waypoint.GetPositionY(), waypoint.GetPositionZ(), false, false);
-}
 
 WorldLocation SimpleDungeonAssistAction::GetBossLocation(uint32 bossEntry)
 {
@@ -384,24 +503,3 @@ std::vector<WorldLocation> SimpleDungeonAssistAction::GetDungeonWaypoints(uint32
     return waypoints;
 }
 
-bool SimpleDungeonAssistAction::MoveToNextWaypoint()
-{
-    std::vector<WorldLocation> waypoints = GetDungeonWaypoints(bot->GetMapId());
-    
-    // Encontrar el waypoint más cercano al bot
-    WorldLocation closestWaypoint = waypoints[0];
-    float closestDistance = bot->GetDistance(waypoints[0].GetPositionX(), waypoints[0].GetPositionY(), waypoints[0].GetPositionZ());
-    
-    for (const WorldLocation& waypoint : waypoints)
-    {
-        float distance = bot->GetDistance(waypoint.GetPositionX(), waypoint.GetPositionY(), waypoint.GetPositionZ());
-        if (distance < closestDistance)
-        {
-            closestDistance = distance;
-            closestWaypoint = waypoint;
-        }
-    }
-    
-    // Mover al waypoint más cercano
-    return MoveToWaypoint(closestWaypoint);
-}

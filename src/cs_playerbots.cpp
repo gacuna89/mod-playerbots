@@ -20,6 +20,9 @@
 #include "PlayerbotMgr.h"
 #include "RandomPlayerbotMgr.h"
 #include "ScriptMgr.h"
+#include "Group.h"
+#include "PlayerbotAI.h"
+#include "Playerbots.h"
 
 using namespace Acore::ChatCommands;
 
@@ -43,6 +46,7 @@ public:
 
         static ChatCommandTable playerbotsCommandTable = {
             {"bot", HandlePlayerbotCommand, SEC_PLAYER, Console::No},
+            {"assist", HandleAssistCommand, SEC_PLAYER, Console::No},
             {"gtask", HandleGuildTaskCommand, SEC_GAMEMASTER, Console::Yes},
             {"pmon", HandlePerfMonCommand, SEC_GAMEMASTER, Console::Yes},
             {"rndbot", HandleRandomPlayerbotCommand, SEC_GAMEMASTER, Console::Yes},
@@ -206,6 +210,117 @@ public:
             handler->PSendSysMessage("PlayerbotMgr instance not found.");
             return false;
         }
+    }
+
+    static bool HandleAssistCommand(ChatHandler* handler, char const* args)
+    {
+        if (!sPlayerbotAIConfig->enabled)
+        {
+            handler->PSendSysMessage("|cffff0000Playerbot system is currently disabled!");
+            return false;
+        }
+
+        WorldSession* m_session = handler->GetSession();
+        if (!m_session)
+        {
+            handler->PSendSysMessage("You may only use this command from an active session");
+            return false;
+        }
+
+        Player* player = m_session->GetPlayer();
+        PlayerbotMgr* mgr = GET_PLAYERBOT_MGR(player);
+        if (!mgr)
+        {
+            handler->PSendSysMessage("You cannot control bots yet");
+            return false;
+        }
+
+        if (!args || !*args)
+        {
+            handler->PSendSysMessage("Usage: .playerbots assist on/off");
+            return false;
+        }
+
+        std::string action = args;
+        
+        if (action == "on")
+        {
+            // Activar modo assist para todos los bots del grupo
+            if (player && player->GetGroup())
+            {
+                for (GroupReference* ref = player->GetGroup()->GetFirstMember(); ref; ref = ref->next())
+                {
+                    Player* member = ref->GetSource();
+                    if (member == player)
+                        continue;
+                    
+                    PlayerbotAI* botAI = GET_PLAYERBOT_AI(member);
+                    if (botAI && botAI->GetAiObjectContext())
+                    {
+                        auto assistModeValue = botAI->GetAiObjectContext()->GetValue<bool>("assist mode");
+                        if (assistModeValue)
+                        {
+                            assistModeValue->Set(true);
+                            // Mensaje del bot al activar assist
+                            member->Say("Te mantendré a salvo. Sígueme.", LANG_UNIVERSAL);
+                            
+                            // Poner marca de estrella al tanque si es tank
+                            if (botAI->IsTank(member))
+                            {
+                                player->GetGroup()->SetTargetIcon(0, player->GetGUID(), member->GetGUID()); // 0 = estrella
+                            }
+                        }
+                    }
+                }
+                handler->PSendSysMessage("Modo assist activado para todos los bots del grupo.");
+            }
+            else
+            {
+                handler->PSendSysMessage("Debes estar en un grupo para usar el comando assist.");
+            }
+        }
+        else if (action == "off")
+        {
+            // Desactivar modo assist para todos los bots del grupo
+            if (player && player->GetGroup())
+            {
+                for (GroupReference* ref = player->GetGroup()->GetFirstMember(); ref; ref = ref->next())
+                {
+                    Player* member = ref->GetSource();
+                    if (member == player)
+                        continue;
+                    
+                    PlayerbotAI* botAI = GET_PLAYERBOT_AI(member);
+                    if (botAI && botAI->GetAiObjectContext())
+                    {
+                        auto assistModeValue = botAI->GetAiObjectContext()->GetValue<bool>("assist mode");
+                        if (assistModeValue)
+                        {
+                            assistModeValue->Set(false);
+                            // Mensaje del bot al desactivar assist
+                            member->Say("Muy bien. Dirige tú.", LANG_UNIVERSAL);
+                            
+                            // Remover marca de estrella del tanque si es tank
+                            if (botAI->IsTank(member))
+                            {
+                                player->GetGroup()->SetTargetIcon(0, player->GetGUID(), ObjectGuid::Empty); // 0 = estrella, Empty = remover
+                            }
+                        }
+                    }
+                }
+                handler->PSendSysMessage("Modo assist desactivado para todos los bots del grupo.");
+            }
+            else
+            {
+                handler->PSendSysMessage("Debes estar en un grupo para usar el comando assist.");
+            }
+        }
+        else
+        {
+            handler->PSendSysMessage("Usage: .playerbots assist on/off");
+        }
+        
+        return true;
     }
 };
 

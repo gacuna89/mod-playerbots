@@ -26,8 +26,7 @@ private:
     bool IsPlayerInRange();
     bool MoveToBoss(uint32 bossEntry);
     void SayMessage(const std::string& message);
-    bool FindPathToBoss(Creature* boss);
-    bool MoveToWaypoint(const WorldLocation& waypoint);
+    bool IsBossAccessible(Creature* boss);
     
     // Variables para evitar spam de mensajes
     uint32 lastTargetBoss = 0;
@@ -41,7 +40,6 @@ private:
     WorldLocation GetBossLocation(uint32 bossEntry);
     std::vector<uint32> GetDungeonBosses(uint32 mapId);
     std::vector<WorldLocation> GetDungeonWaypoints(uint32 mapId);
-    bool MoveToNextWaypoint();
 };
 
 #endif
