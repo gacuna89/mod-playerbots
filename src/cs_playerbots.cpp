@@ -20,7 +20,6 @@
 #include "PlayerbotMgr.h"
 #include "RandomPlayerbotMgr.h"
 #include "ScriptMgr.h"
-<<<<<<< HEAD
 #include "RaidBuilderCommand.h"
 #include "Group.h"
 #include "PlayerbotAI.h"
