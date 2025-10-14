@@ -37,6 +37,8 @@ private:
     void AddNaturalVariation(float& x, float& y, float& z);
     void SetNaturalMovementSpeed();
     void ShowArrivalMessage(uint32 waypointId);
+    void EnsurePartyFollowsTank();
+    void HandoverGuideToMaster();
     
     // Variables para evitar spam de mensajes
     uint32 lastTargetBoss = 0;

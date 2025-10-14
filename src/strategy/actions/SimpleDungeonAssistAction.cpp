@@ -52,6 +52,9 @@ bool SimpleDungeonAssistAction::isUseful()
 
 bool SimpleDungeonAssistAction::Execute(Event event)
 {
+    // Si el modo assist está activo y este bot es tanque, asegurar que el grupo sigue al tanque
+    EnsurePartyFollowsTank();
+
     // Primero intentar moverse hacia el boss
     MoveToNextBoss();
     
@@ -388,10 +391,8 @@ bool SimpleDungeonAssistAction::MoveToBoss(uint32 bossEntry)
                         LOG_ERROR("playerbots", "DEBUG: Interrumpido hechizo para reposicionarse");
                     }
                     
-                    // FORZAR movimiento incluso con LOS bloqueado - intentar múltiples estrategias
-                    LOG_ERROR("playerbots", "DEBUG: LOS bloqueado pero FORZANDO movimiento hacia el boss");
-                    
-                    // Estrategia 1: Intentar pathfinding normal primero
+                    // Evitar forzar el movimiento cuando no hay LOS o hay gran diferencia de altura.
+                    // 1) Intentar pathfinding normal primero (sin forzar)
                     PathGenerator path(bot);
                     path.CalculatePath(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), false);
                     
@@ -403,26 +404,10 @@ bool SimpleDungeonAssistAction::MoveToBoss(uint32 bossEntry)
                     }
                     else
                     {
-                        LOG_ERROR("playerbots", "DEBUG: PathGenerator falló, intentando movimiento directo forzado");
-                        
-                        // Estrategia 2: Movimiento directo forzado (ignorar pathfinding)
-                        // Esto es útil cuando el pathfinding falla pero el bot puede moverse directamente
-                        canMove = MoveTo(targetLocation.GetMapId(), targetLocation.GetPositionX(), targetLocation.GetPositionY(), targetLocation.GetPositionZ(), true, false); // true = forzar
-                        LOG_ERROR("playerbots", "DEBUG: MoveTo forzado resultado: {}", canMove ? "ÉXITO" : "FALLO");
-                        
-                        // Estrategia 3: Si falla, intentar acercarse gradualmente
-                        if (!canMove)
-                        {
-                            LOG_ERROR("playerbots", "DEBUG: Movimiento forzado falló, intentando acercamiento gradual");
-                            
-                            // Calcular punto intermedio más cercano al bot
-                            float midX = bot->GetPositionX() + (creature->GetPositionX() - bot->GetPositionX()) * 0.5f;
-                            float midY = bot->GetPositionY() + (creature->GetPositionY() - bot->GetPositionY()) * 0.5f;
-                            float midZ = bot->GetPositionZ() + (creature->GetPositionZ() - bot->GetPositionZ()) * 0.3f; // Menos cambio en Z
-                            
-                            canMove = MoveTo(targetLocation.GetMapId(), midX, midY, midZ, true, false);
-                            LOG_ERROR("playerbots", "DEBUG: Acercamiento gradual resultado: {}", canMove ? "ÉXITO" : "FALLO");
-                        }
+                        LOG_ERROR("playerbots", "DEBUG: PathGenerator falló sin LOS; intentando waypoints");
+                        // 2) Probar navegación por waypoints predefinidos para evitar atravesar puertas/muros
+                        canMove = MoveToBossUsingWaypoints(creature);
+                        LOG_ERROR("playerbots", "DEBUG: Waypoints resultado: {}", canMove ? "ÉXITO" : "FALLO");
                     }
                 }
                 else
@@ -437,6 +422,14 @@ bool SimpleDungeonAssistAction::MoveToBoss(uint32 bossEntry)
                 {
                     LOG_ERROR("playerbots", "DEBUG: MoveTo falló, intentando estrategias alternativas...");
                     
+                    // Si no hay LOS, evitar estrategias agresivas que puedan atravesar obstáculos
+                    if (losBlocked)
+                    {
+                        LOG_ERROR("playerbots", "DEBUG: Sin LOS: evitar estrategias agresivas; probar siguiente boss");
+                        retryCount = 0;
+                        return false; // probar otro objetivo
+                    }
+
                     // Estrategia 1: Punto intermedio con variación aleatoria (como Warsong)
                     float midX = (bot->GetPositionX() + creature->GetPositionX()) / 2.0f;
                     float midY = (bot->GetPositionY() + creature->GetPositionY()) / 2.0f;
@@ -485,10 +478,12 @@ bool SimpleDungeonAssistAction::MoveToBoss(uint32 bossEntry)
                 
                 if (retryCount >= persistentMaxRetries)
                 {
-                    SayMessage("Persistencia agotada con " + creature->GetName() + ", intentando siguiente objetivo...");
+                    SayMessage("No puedo llegar hasta " + creature->GetName() + ". Necesito tu ayuda. Devolviendo la guía.");
                     LOG_ERROR("playerbots", "DEBUG: Máximo de reintentos persistente alcanzado para boss {}", bossEntry);
+                    // Entregar la guía al jugador (apagar assist) y detener movimiento
+                    HandoverGuideToMaster();
                     retryCount = 0;
-                    return false; // Intentar siguiente boss
+                    return false; // Intentar siguiente boss (pero ya sin assist si se apagó)
                 }
                 
                 // Esperar menos tiempo entre reintentos para ser más agresivo
@@ -537,6 +532,64 @@ void SimpleDungeonAssistAction::SayMessage(const std::string& message)
         return;
 
     bot->Say(message, LANG_UNIVERSAL);
+}
+
+void SimpleDungeonAssistAction::EnsurePartyFollowsTank()
+{
+    // Asegurar que, con assist activo, los demás bots sigan al tanque
+    AiObjectContext* context = botAI->GetAiObjectContext();
+    if (!context)
+        return;
+
+    auto assistModeValue = context->GetValue<bool>("assist mode");
+    if (!assistModeValue || !assistModeValue->Get())
+        return;
+
+    Group* group = bot->GetGroup();
+    if (!group || !botAI->IsTank(bot))
+        return;
+
+    for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+    {
+        Player* member = ref->GetSource();
+        if (!member || member == bot)
+            continue;
+
+        PlayerbotAI* memberAI = GET_PLAYERBOT_AI(member);
+        if (!memberAI)
+            continue;
+
+        // Empujar formación de seguimiento al tanque
+        if (!memberAI->HasStrategy("follow", BOT_STATE_NON_COMBAT))
+            memberAI->ChangeStrategy("+follow,-stay", BOT_STATE_NON_COMBAT);
+    }
+}
+
+void SimpleDungeonAssistAction::HandoverGuideToMaster()
+{
+    // Apagar assist en todos los bots del grupo y devolver mensaje al jugador
+    Group* group = bot->GetGroup();
+    if (!group)
+        return;
+
+    Player* master = botAI->GetMaster();
+    for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+    {
+        Player* member = ref->GetSource();
+        if (!member || !member->GetSession()->IsBot())
+            continue;
+
+        PlayerbotAI* memberAI = GET_PLAYERBOT_AI(member);
+        if (!memberAI || !memberAI->GetAiObjectContext())
+            continue;
+
+        auto assistModeValue = memberAI->GetAiObjectContext()->GetValue<bool>("assist mode");
+        if (assistModeValue)
+            assistModeValue->Set(false);
+    }
+
+    if (master)
+        botAI->TellMaster("No puedo avanzar. Retomas la guía.");
 }
 
 bool SimpleDungeonAssistAction::IsBossAccessible(Creature* boss)
