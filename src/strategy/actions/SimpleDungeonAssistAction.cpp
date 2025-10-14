@@ -532,6 +532,10 @@ bool SimpleDungeonAssistAction::IsPlayerInRange()
 
 void SimpleDungeonAssistAction::SayMessage(const std::string& message)
 {
+    // Solo el tanque debe emitir mensajes públicos para evitar spam del grupo
+    if (!botAI->IsTank(bot))
+        return;
+
     bot->Say(message, LANG_UNIVERSAL);
 }
 
