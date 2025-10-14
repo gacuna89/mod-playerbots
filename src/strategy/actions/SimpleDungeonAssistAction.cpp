@@ -8,6 +8,7 @@
 #include "LootObjectStack.h"
 #include "PathGenerator.h"
 #include "Log.h"
+#include "PlayerbotTextMgr.h"
 
 bool SimpleDungeonAssistAction::isUseful()
 {
@@ -650,5 +651,430 @@ std::vector<WorldLocation> SimpleDungeonAssistAction::GetDungeonWaypoints(uint32
     }
     
     return waypoints;
+}
+
+// NUEVO: Sistema de waypoints optimizado usando tabla dungeon_waypoints
+std::vector<WorldLocation> SimpleDungeonAssistAction::GetDungeonWaypointsForMap(uint32 mapId)
+{
+    std::vector<WorldLocation> waypoints;
+    
+    // Obtener waypoints desde la tabla dungeon_waypoints ordenados por waypoint_order
+    QueryResult result = WorldDatabase.Query(
+        "SELECT position_x, position_y, position_z, waypoint_name, bot_message_id, comment FROM dungeon_waypoints WHERE map_id = {} AND is_critical = 1 ORDER BY waypoint_order",
+        mapId
+    );
+    
+    if (result)
+    {
+        do
+        {
+            Field* fields = result->Fetch();
+            float x = fields[0].Get<float>();
+            float y = fields[1].Get<float>();
+            float z = fields[2].Get<float>();
+            std::string waypointName = fields[3].Get<std::string>();
+            uint32 botMessageId = fields[4].Get<uint32>();
+            std::string comment = fields[5].Get<std::string>();
+            
+            // Crear WorldLocation directamente
+            WorldLocation waypoint(mapId, x, y, z);
+            waypoints.push_back(waypoint);
+            
+        } while (result->NextRow());
+    }
+    
+    return waypoints;
+}
+
+WorldLocation SimpleDungeonAssistAction::GetWaypointLocation(uint32 waypointId)
+{
+    // Obtener coordenadas del waypoint desde la tabla dungeon_waypoints
+    QueryResult result = WorldDatabase.Query(
+        "SELECT position_x, position_y, position_z, waypoint_name, bot_message_id, comment FROM dungeon_waypoints WHERE waypoint_id = {} AND map_id = 36 LIMIT 1",
+        waypointId
+    );
+    
+    if (result)
+    {
+        Field* fields = result->Fetch();
+        float x = fields[0].Get<float>();
+        float y = fields[1].Get<float>();
+        float z = fields[2].Get<float>();
+        std::string waypointName = fields[3].Get<std::string>();
+        uint32 botMessageId = fields[4].Get<uint32>();
+        std::string comment = fields[5].Get<std::string>();
+        
+        // Usar mensaje personalizado del bot desde ai_playerbot_texts
+        if (botMessageId > 0)
+        {
+            // Obtener el nombre del texto desde la base de datos
+            QueryResult textResult = WorldDatabase.Query(
+                "SELECT name FROM ai_playerbot_texts WHERE id = {} LIMIT 1",
+                botMessageId
+            );
+            
+            if (textResult)
+            {
+                Field* textFields = textResult->Fetch();
+                std::string textName = textFields[0].Get<std::string>();
+                std::string botMessage = sPlayerbotTextMgr->GetBotText(textName);
+                if (!botMessage.empty())
+                {
+                    botAI->TellMaster(botMessage);
+                }
+                else
+                {
+                    botAI->TellMaster("Usando waypoint: " + waypointName);
+                }
+            }
+            else
+            {
+                botAI->TellMaster("Usando waypoint: " + waypointName);
+            }
+        }
+        else
+        {
+            botAI->TellMaster("Usando waypoint: " + waypointName);
+        }
+        
+        // Mostrar comentario si está disponible (para debug)
+        if (!comment.empty())
+        {
+            botAI->TellMaster("Info: " + comment);
+        }
+        
+        return WorldLocation(36, x, y, z); // Deadmines map ID = 36
+    }
+    
+    // Si no se encuentra en dungeon_waypoints, intentar en waypoint_data como fallback
+    result = WorldDatabase.Query(
+        "SELECT position_x, position_y, position_z FROM waypoint_data WHERE id = {} AND point = 1 LIMIT 1",
+        waypointId
+    );
+    
+    if (result)
+    {
+        Field* fields = result->Fetch();
+        float x = fields[0].Get<float>();
+        float y = fields[1].Get<float>();
+        float z = fields[2].Get<float>();
+        
+        botAI->TellMaster("Usando waypoint fallback ID " + std::to_string(waypointId) + " en (" + std::to_string((int)x) + ", " + std::to_string((int)y) + ", " + std::to_string((int)z) + ")");
+        
+        return WorldLocation(36, x, y, z);
+    }
+    
+    // Si no se encuentra, retornar ubicación por defecto
+    botAI->TellMaster("ERROR: No se encontró waypoint ID " + std::to_string(waypointId));
+    return WorldLocation(36, 0.0f, 0.0f, 0.0f);
+}
+
+// NUEVO: Sistema de movimiento natural con waypoints
+bool SimpleDungeonAssistAction::MoveToBossUsingWaypoints(Creature* boss)
+{
+    if (!boss)
+        return false;
+    
+    // Obtener waypoints optimizados para el mapa actual
+    uint32 currentMapId = bot->GetMapId();
+    std::vector<WorldLocation> waypoints = GetDungeonWaypointsForMap(currentMapId);
+    
+    if (waypoints.empty())
+    {
+        botAI->TellMaster("No se encontraron waypoints para el mapa " + std::to_string(currentMapId));
+        return false;
+    }
+    
+    // Estrategia inteligente: encontrar el waypoint correcto según el boss
+    WorldLocation targetWaypoint;
+    bool foundWaypoint = false;
+    
+    // Primero intentar encontrar el waypoint específico para este boss
+    QueryResult result = WorldDatabase.Query(
+        "SELECT position_x, position_y, position_z, waypoint_name, bot_message_id FROM dungeon_waypoints WHERE boss_entry = {} AND map_id = {} LIMIT 1",
+        boss->GetEntry(), currentMapId
+    );
+    
+    if (result)
+    {
+        Field* fields = result->Fetch();
+        float x = fields[0].Get<float>();
+        float y = fields[1].Get<float>();
+        float z = fields[2].Get<float>();
+        std::string waypointName = fields[3].Get<std::string>();
+        uint32 botMessageId = fields[4].Get<uint32>();
+        
+        targetWaypoint = WorldLocation(currentMapId, x, y, z);
+        foundWaypoint = true;
+        
+        // Mostrar mensaje personalizado
+        if (botMessageId > 0)
+        {
+            // Obtener el nombre del texto desde la base de datos
+            QueryResult textResult = WorldDatabase.Query(
+                "SELECT name FROM ai_playerbot_texts WHERE id = {} LIMIT 1",
+                botMessageId
+            );
+            
+            if (textResult)
+            {
+                Field* textFields = textResult->Fetch();
+                std::string textName = textFields[0].Get<std::string>();
+                std::string botMessage = sPlayerbotTextMgr->GetBotText(textName);
+                if (!botMessage.empty())
+                {
+                    botAI->TellMaster(botMessage);
+                }
+            }
+        }
+        
+        botAI->TellMaster("Encontrado waypoint específico para boss " + std::to_string(boss->GetEntry()));
+    }
+    else
+    {
+        // Si no hay waypoint específico, encontrar el más cercano al boss
+        float minDistance = FLT_MAX;
+        
+        for (const WorldLocation& waypoint : waypoints)
+        {
+            if (waypoint.GetPositionX() == 0.0f && waypoint.GetPositionY() == 0.0f)
+                continue;
+            
+            float distance = boss->GetDistance(waypoint.GetPositionX(), waypoint.GetPositionY(), waypoint.GetPositionZ());
+            if (distance < minDistance)
+            {
+                minDistance = distance;
+                targetWaypoint = waypoint;
+                foundWaypoint = true;
+            }
+        }
+        
+        if (foundWaypoint)
+        {
+            botAI->TellMaster("Usando waypoint más cercano al boss (distancia: " + std::to_string((int)minDistance) + " yardas)");
+        }
+    }
+    
+    if (!foundWaypoint)
+    {
+        botAI->TellMaster("ERROR: No se encontró waypoint válido para boss " + std::to_string(boss->GetEntry()));
+        return false;
+    }
+    
+    // Moverse al waypoint con movimiento natural
+    return MoveToWaypointWithNaturalMovement(targetWaypoint);
+}
+
+bool SimpleDungeonAssistAction::MoveToWaypointWithNaturalMovement(const WorldLocation& waypoint)
+{
+    if (waypoint.GetPositionX() == 0.0f && waypoint.GetPositionY() == 0.0f)
+        return false;
+    
+    // Añadir variación natural a las coordenadas
+    float x = waypoint.GetPositionX();
+    float y = waypoint.GetPositionY();
+    float z = waypoint.GetPositionZ();
+    
+    AddNaturalVariation(x, y, z);
+    
+    // Configurar velocidad natural
+    SetNaturalMovementSpeed();
+    
+    // Intentar movimiento con pathfinding
+    bool canMove = MoveTo(waypoint.GetMapId(), x, y, z, false, false);
+    
+    if (canMove)
+    {
+        isMovingNaturally = true;
+        lastWaypointTime = getMSTime();
+        
+        // Añadir pequeña pausa natural ocasionalmente
+        if (urand(1, 10) <= 2) // 20% de probabilidad
+        {
+            botAI->SetNextCheckDelay(urand(500, 1500)); // Pausa de 0.5-1.5 segundos
+        }
+        
+        // Verificar si llegamos al waypoint (distancia < 5 yardas)
+        float distanceToWaypoint = bot->GetDistance(x, y, z);
+        if (distanceToWaypoint < 5.0f)
+        {
+            // Buscar el mensaje de llegada por coordenadas aproximadas
+            QueryResult result = WorldDatabase.Query(
+                "SELECT arrival_message_id FROM dungeon_waypoints WHERE position_x BETWEEN {} AND {} AND position_y BETWEEN {} AND {} AND map_id = {} LIMIT 1",
+                x - 10.0f, x + 10.0f, y - 10.0f, y + 10.0f, waypoint.GetMapId()
+            );
+            
+            if (result)
+            {
+                Field* fields = result->Fetch();
+                uint32 arrivalMessageId = fields[0].Get<uint32>();
+                
+                if (arrivalMessageId > 0)
+                {
+                    // Obtener el nombre del texto desde la base de datos
+                    QueryResult textResult = WorldDatabase.Query(
+                        "SELECT name FROM ai_playerbot_texts WHERE id = {} LIMIT 1",
+                        arrivalMessageId
+                    );
+                    
+                    if (textResult)
+                    {
+                        Field* textFields = textResult->Fetch();
+                        std::string textName = textFields[0].Get<std::string>();
+                        std::string arrivalMessage = sPlayerbotTextMgr->GetBotText(textName);
+                        if (!arrivalMessage.empty())
+                        {
+                            botAI->TellMaster(arrivalMessage);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    return canMove;
+}
+
+void SimpleDungeonAssistAction::AddNaturalVariation(float& x, float& y, float& z)
+{
+    // Añadir variación aleatoria pequeña para evitar movimiento robótico
+    float variation = 2.0f; // 2 yardas de variación máxima
+    
+    x += frand(-variation, variation);
+    y += frand(-variation, variation);
+    // No variar Z para evitar problemas de altura
+}
+
+void SimpleDungeonAssistAction::SetNaturalMovementSpeed()
+{
+    // Variar la velocidad de movimiento para hacerlo más natural
+    float baseSpeed = 1.0f;
+    float variation = 0.2f; // ±20% de variación
+    
+    naturalMovementSpeed = baseSpeed + frand(-variation, variation);
+    
+    // Aplicar la velocidad al bot (si es posible)
+    if (bot->GetMotionMaster()->GetCurrentMovementGeneratorType() == POINT_MOTION_TYPE)
+    {
+        // El bot ya está en movimiento, no interrumpir
+        return;
+    }
+}
+
+// NUEVO: Movimiento directo mejorado (fallback cuando waypoints fallan)
+bool SimpleDungeonAssistAction::MoveToBossDirect(Creature* boss)
+{
+    if (!boss)
+        return false;
+    
+    WorldLocation targetLocation(boss->GetMapId(), boss->GetPositionX(), boss->GetPositionY(), boss->GetPositionZ());
+    float distanceToBoss = bot->GetDistance(boss);
+    
+    // Debug técnico detallado
+    float botX = bot->GetPositionX();
+    float botY = bot->GetPositionY();
+    float botZ = bot->GetPositionZ();
+    float bossX = boss->GetPositionX();
+    float bossY = boss->GetPositionY();
+    float bossZ = boss->GetPositionZ();
+    
+    LOG_ERROR("playerbots", "DEBUG: Bot pos: ({}, {}, {})", (int)botX, (int)botY, (int)botZ);
+    LOG_ERROR("playerbots", "DEBUG: Boss pos: ({}, {}, {})", (int)bossX, (int)bossY, (int)bossZ);
+    LOG_ERROR("playerbots", "DEBUG: Distancia: {} yardas", (int)distanceToBoss);
+    
+    // Verificar si el boss es accesible
+    bool isBossAccessible = IsBossAccessible(boss);
+    
+    if (distanceToBoss <= 10.0f && bot->IsWithinLOS(bossX, bossY, bossZ))
+    {
+        // Muy cerca y con línea de visión - movimiento directo
+        LOG_ERROR("playerbots", "DEBUG: Usando MoveNear (muy cerca)");
+        return MoveNear(targetLocation.GetMapId(), targetLocation.GetPositionX(), targetLocation.GetPositionY(), targetLocation.GetPositionZ(), 0);
+    }
+    else if (isBossAccessible)
+    {
+        // Boss es accesible - usar pathfinding mejorado
+        LOG_ERROR("playerbots", "DEBUG: Usando MoveTo (pathfinding)");
+        
+        // Usar pathfinding con verificación de altura más flexible
+        bool losBlocked = !bot->IsWithinLOSInMap(boss) || fabs(botZ - bossZ) > 15.0f; // Aumentado de 5 a 15
+        LOG_ERROR("playerbots", "DEBUG: LOS bloqueado: {}, diferencia altura: {}", losBlocked, (int)fabs(botZ - bossZ));
+        
+        if (losBlocked)
+        {
+            // Interrumpir hechizos si está casteando
+            if (bot->IsNonMeleeSpellCast(false, true, true, false, true))
+            {
+                bot->InterruptNonMeleeSpells(true);
+                LOG_ERROR("playerbots", "DEBUG: Interrumpido hechizo para reposicionarse");
+            }
+            
+            // Intentar pathfinding normal primero
+            PathGenerator path(bot);
+            path.CalculatePath(bossX, bossY, bossZ, false);
+            
+            if (path.GetPathType() != PATHFIND_NOPATH)
+            {
+                LOG_ERROR("playerbots", "DEBUG: PathGenerator encontró camino válido");
+                return MoveTo(targetLocation.GetMapId(), targetLocation.GetPositionX(), targetLocation.GetPositionY(), targetLocation.GetPositionZ(), false, false);
+            }
+            else
+            {
+                LOG_ERROR("playerbots", "DEBUG: PathGenerator falló, intentando movimiento directo forzado");
+                return MoveTo(targetLocation.GetMapId(), targetLocation.GetPositionX(), targetLocation.GetPositionY(), targetLocation.GetPositionZ(), true, false);
+            }
+        }
+        else
+        {
+            LOG_ERROR("playerbots", "DEBUG: LOS libre, movimiento directo");
+            return MoveTo(targetLocation.GetMapId(), targetLocation.GetPositionX(), targetLocation.GetPositionY(), targetLocation.GetPositionZ(), false, false);
+        }
+    }
+    
+    return false;
+}
+
+// NUEVO: Estrategias alternativas de movimiento
+bool SimpleDungeonAssistAction::TryAlternativeMovementStrategies(Creature* boss, uint32 retryCount)
+{
+    if (!boss)
+        return false;
+    
+    LOG_ERROR("playerbots", "DEBUG: Intentando estrategia alternativa {} para boss {}", retryCount, boss->GetEntry());
+    
+    // Estrategia 1: Punto intermedio con variación
+    if (retryCount % 3 == 1)
+    {
+        float midX = (bot->GetPositionX() + boss->GetPositionX()) / 2.0f;
+        float midY = (bot->GetPositionY() + boss->GetPositionY()) / 2.0f;
+        float midZ = (bot->GetPositionZ() + boss->GetPositionZ()) / 2.0f;
+        
+        // Añadir variación aleatoria
+        midX += frand(-3.0f, 3.0f);
+        midY += frand(-3.0f, 3.0f);
+        
+        LOG_ERROR("playerbots", "DEBUG: Estrategia 1 - Punto intermedio con variación");
+        return MoveTo(boss->GetMapId(), midX, midY, midZ, false, false);
+    }
+    // Estrategia 2: Acercamiento gradual
+    else if (retryCount % 3 == 2)
+    {
+        float closerX = bot->GetPositionX() + (boss->GetPositionX() - bot->GetPositionX()) * 0.4f;
+        float closerY = bot->GetPositionY() + (boss->GetPositionY() - bot->GetPositionY()) * 0.4f;
+        float closerZ = bot->GetPositionZ() + (boss->GetPositionZ() - bot->GetPositionZ()) * 0.4f;
+        
+        LOG_ERROR("playerbots", "DEBUG: Estrategia 2 - Acercamiento gradual");
+        return MoveTo(boss->GetMapId(), closerX, closerY, closerZ, false, false);
+    }
+    // Estrategia 3: Movimiento agresivo
+    else
+    {
+        float aggressiveX = bot->GetPositionX() + (boss->GetPositionX() - bot->GetPositionX()) * 0.8f;
+        float aggressiveY = bot->GetPositionY() + (boss->GetPositionY() - bot->GetPositionY()) * 0.8f;
+        float aggressiveZ = bot->GetPositionZ() + (boss->GetPositionZ() - bot->GetPositionZ()) * 0.6f;
+        
+        LOG_ERROR("playerbots", "DEBUG: Estrategia 3 - Movimiento agresivo");
+        return MoveTo(boss->GetMapId(), aggressiveX, aggressiveY, aggressiveZ, true, false);
+    }
 }
 
