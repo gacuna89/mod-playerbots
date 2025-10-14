@@ -11,4 +11,7 @@ void TankAssistStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
 {
     triggers.push_back(
         new TriggerNode("tank assist", NextAction::array(0, new NextAction("tank assist", 50.0f), nullptr)));
+    
+    triggers.push_back(
+        new TriggerNode("simple dungeon assist", NextAction::array(0, new NextAction("simple dungeon assist", ACTION_MOVE + 5), nullptr)));
 }
